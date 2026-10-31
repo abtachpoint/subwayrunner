@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "subway-runner-api",
+  "main": "index.js",
+  "compatibility_date": "2026-10-30",
+  "workers_dev": true,
+  "observability": { "enabled": false },
+  "vars": {
+    "FIREBASE_PROJECT_ID": "subway-runner-513217",
+    "PLAY_PACKAGE_NAME": "com.subwayrunner.bd",
+    "ADMOB_REVIVE_AD_UNIT": "ca-app-pub-1379059201302335/6015873225",
+    "ADMOB_SPIN_AD_UNIT": "ca-app-pub-1379059201302335/7963379715"
+  },
+  "triggers": { "crons": ["*/5 * * * *"] }
+}
