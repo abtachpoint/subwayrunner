@@ -109,7 +109,10 @@ class DiamondBilling(private val activity: Activity, private val auth: FirebaseA
                 val product = products[id]
                 if (product == null || !client.isReady) { callback(null, ApiFailure("PRODUCT_NOT_AVAILABLE", "This product has not been made available in Play Console.")); return }
                 val params = BillingFlowParams.ProductDetailsParams.newBuilder().setProductDetails(product)
-                product.oneTimePurchaseOfferDetailsList?.firstOrNull()?.let { params.setOfferToken(it.offerToken) }
+
+product.oneTimePurchaseOfferDetailsList?.firstOrNull()?.offerToken
+    ?.takeIf { it.isNotBlank() }
+    ?.let { token -> params.setOfferToken(token) }
                 val flow = BillingFlowParams.newBuilder().setProductDetailsParamsList(listOf(params.build()))
                     .setObfuscatedAccountId(expected).build()
                 val result = client.launchBillingFlow(activity, flow)
