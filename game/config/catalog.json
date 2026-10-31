@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "currency_name": "Coins",
+  "styles": [
+    {"id": "courier", "name": "Kai", "subtitle": "City courier", "unlock": "free", "accent": "ffb45f"},
+    {"id": "skater", "name": "Mira", "subtitle": "Weekend skater", "unlock": "free", "accent": "60dcc3"},
+    {"id": "sprinter", "name": "Zuri", "subtitle": "Track champion", "unlock": "coins", "cost": 1200, "accent": "fb7a94"},
+    {"id": "robot", "name": "Bolt", "subtitle": "Metro mechanic", "unlock": "coins", "cost": 3500, "accent": "84b6ff"},
+    {"id": "astronaut", "name": "Nova", "subtitle": "Space explorer", "unlock": "premium", "product_id": "character_astronaut", "accent": "e8e6ff"},
+    {"id": "neon", "name": "Flux", "subtitle": "After-dark runner", "unlock": "premium", "product_id": "character_neon", "accent": "b7a0ff"}
+  ],
+  "products": [
+    {"id": "coin_pack_small", "name": "Pocketful of coins", "description": "1,000 coins", "type": "consumable", "coins": 1000},
+    {"id": "coin_pack_medium", "name": "Coin chest", "description": "6,000 coins", "type": "consumable", "coins": 6000},
+    {"id": "coin_pack_large", "name": "Metro treasury", "description": "15,000 coins", "type": "consumable", "coins": 15000},
+    {"id": "starter_pack", "name": "Explorer starter pack", "description": "Nova character + 2,000 coins", "type": "non_consumable", "grants_style": "astronaut", "coins": 2000},
+    {"id": "remove_forced_ads", "name": "Remove automatic ads", "description": "No automatic ads. Optional reward videos remain available for adults.", "type": "non_consumable"},
+    {"id": "character_astronaut", "name": "Nova", "description": "Permanent space-explorer character", "type": "non_consumable", "grants_style": "astronaut"},
+    {"id": "character_neon", "name": "Flux", "description": "Permanent after-dark runner character", "type": "non_consumable", "grants_style": "neon"}
+  ]
+}

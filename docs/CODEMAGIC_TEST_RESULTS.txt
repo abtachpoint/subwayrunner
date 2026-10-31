@@ -1,0 +1,14 @@
+test_all_payload_entries_must_be_cryptographically_signed (test_ci_bundle.BundleVerification.test_all_payload_entries_must_be_cryptographically_signed) ... ok
+test_payload_tampering_fails_jdk_signature_verification (test_ci_bundle.BundleVerification.test_payload_tampering_fails_jdk_signature_verification) ... ok
+test_renamed_or_incomplete_zip_is_not_a_bundle (test_ci_bundle.BundleVerification.test_renamed_or_incomplete_zip_is_not_a_bundle) ... ok
+test_signer_matches_the_configured_private_upload_keystore (test_ci_bundle.BundleVerification.test_signer_matches_the_configured_private_upload_keystore) ... ok
+test_unsigned_fixture_is_rejected_even_when_jarsigner_exit_status_is_zero (test_ci_bundle.BundleVerification.test_unsigned_fixture_is_rejected_even_when_jarsigner_exit_status_is_zero) ... ok
+test_wrong_authorized_upload_fingerprint_is_rejected (test_ci_bundle.BundleVerification.test_wrong_authorized_upload_fingerprint_is_rejected) ... ok
+test_codemagic_requires_managed_signing_and_real_gradle_output (test_ci_bundle.WorkflowConfiguration.test_codemagic_requires_managed_signing_and_real_gradle_output) ... ok
+test_owner_verified_games_resource_and_manifest_are_connected (test_ci_bundle.WorkflowConfiguration.test_owner_verified_games_resource_and_manifest_are_connected) ... ok
+test_setup_rejects_missing_managed_key_without_starting_downloads (test_ci_bundle.WorkflowConfiguration.test_setup_rejects_missing_managed_key_without_starting_downloads) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 4.954s
+
+OK

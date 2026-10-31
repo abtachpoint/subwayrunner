@@ -1,0 +1,64 @@
+# Keep this file at the repository root, beside android/, web/, and tools/.
+workflows:
+  android-internal:
+    name: Subway Runner signed internal AAB
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      java: 17
+      node: "24"
+      android_signing:
+        - subway_runner_upload
+      vars:
+        PLAY_GAMES_APP_ID: "613238310945"
+        ADS_MODE: "live"
+        # Optional: ANDROID_VERSION_CODE: "300" when Play already has a higher code.
+        # By default setup uses 100 + PROJECT_BUILD_NUMBER (or BUILD_NUMBER).
+    cache:
+      cache_paths:
+        - $HOME/.gradle/caches
+        - $CM_BUILD_DIR/.ci/downloads
+    scripts:
+      - name: Require owner upload signing and prepare Android tools
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
+          bash tools/codemagic_setup.sh
+      - name: Test game and backend logic
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
+          node --test --test-isolation=none tests/*.test.cjs
+          npm --prefix worker test
+          python3 -m unittest discover -s tests -p 'test_ci_*.py'
+      - name: Build and verify signed release bundle
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
+          bash tools/build_android.sh --require-signing --ads-mode live
+      - name: Build and verify signed installable APK
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR/android"
+          "$GRADLE_EXECUTABLE" --no-daemon --stacktrace \
+            "-PplayGamesAppId=$PLAY_GAMES_APP_ID" \
+            "-PadsMode=$ADS_MODE" \
+            -PrequireSigning=true :app:assembleRelease
+          apk="$CM_BUILD_DIR/android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk" || { echo "Android release APK missing" >&2; exit 1; }
+          verifier="$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner"
+          test -x "$verifier" || { echo "Android apksigner missing" >&2; exit 1; }
+          "$verifier" verify --verbose "$apk"
+          mkdir -p "$CM_BUILD_DIR/release"
+          cp "$apk" "$CM_BUILD_DIR/release/Subway-Runner-internal.apk"
+          cd "$CM_BUILD_DIR/release"
+          shasum -a 256 Subway-Runner-internal.apk > Subway-Runner-internal.apk.sha256
+    artifacts:
+      - release/*.aab
+      - release/*.aab.sha256
+      - release/*.aab.build.json
+      - release/*.apk
+      - release/*.apk.sha256
+      - android/app/build/reports/**/*
+      - android/app/build/test-results/**/*
+    # Deliberately no Google Play publishing: download and upload the AAB manually.

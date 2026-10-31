@@ -1,0 +1,25 @@
+PASS: Required source file: web/index.html
+PASS: Required source file: web/app.js
+PASS: Required source file: web/simulation.js
+PASS: Required source file: web/renderer.js
+PASS: Required source file: web/assets/models.js
+PASS: Required source file: android/settings.gradle.kts
+PASS: Required source file: android/app/build.gradle.kts
+PASS: Required source file: android/app/src/main/AndroidManifest.xml
+PASS: Firebase configuration belongs in the application module
+PASS: Firebase project ID matches supplied owner configuration
+PASS: Firebase project number matches
+PASS: Exactly one Firebase Android client matches the final package
+PASS: Firebase Android App ID matches
+PASS: Android application uses final package identity
+PASS: Google Services plugin is applied to the application module
+PASS: Play Games app_id has the expected numeric resource format
+PASS: Play Games app_id matches the owner's verified Configuration-page ID
+LIMIT: owner upload signing is unavailable; any release AAB produced without it is unsigned and cannot be uploaded yet.
+ADS MODE: test; live rewarded delivery/SSV must be tested separately.
+AVAILABLE: Java 17+ runtime
+BUILD BLOCKED: Gradle executable
+BUILD BLOCKED: Android API 36 platform
+BUILD BLOCKED: Android build tools 36.0.0
+NOT VERIFIED: SDK compilation, Android install/runtime, upload-key authorization, live auth, purchase verification, rewarded SSV and external deletion/privacy pages.
+PASS: source preflight.

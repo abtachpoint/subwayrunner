@@ -1,0 +1,19 @@
+WEB SIMULATION: 43 checks passed. No browser/device behavior covered.
+WEB UI: 150 checks passed. Production app/simulation with DOM, renderer and native-service adapters; browser rendering, deployed backend and Android SDK/device behavior are not covered.
+✔ existing course, renderer and original character/city geometry are preserved byte-for-byte (12.966975ms)
+✔ standard Android app hosts existing WebGL assets with the final identity (28.201873ms)
+✔ provided Firebase Android configuration is matched without guessing OAuth resources (0.888471ms)
+✔ active Android application has no automatic or non-rewarded ad implementation (0.962964ms)
+✔ production web client contains no successful local demo-ad or paid-diamond grant path (1.650883ms)
+✔ backend deployment targets the provided worker/project and denies direct Firestore clients (0.239221ms)
+✔ no private key material is embedded in active app, web assets or Worker source/config (15.839311ms)
+✔ tests/web_simulation.test.cjs (0.115164ms)
+✔ tests/web_ui.test.cjs (11.732186ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 300.020634

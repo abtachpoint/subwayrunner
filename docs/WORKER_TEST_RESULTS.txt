@@ -1,0 +1,41 @@
+
+> subway-runner-api@1.0.0 test
+> node --test --test-isolation=none
+
+✔ parallel free-spin requests grant exactly once; UTC reset and operation replay are authoritative (11.134463ms)
+✔ diamond spins debit 20 atomically; insufficient balance cannot race into negative currency (4.54089ms)
+✔ pending spin intents reserve both daily slots and verified callback grants once globally (5.356046ms)
+✔ wrong ad unit and expired callback cannot grant; reservations expire and release slots (1.627958ms)
+✔ revive is bound to one live run and run finish credits bounded normal coins only once (3.933998ms)
+✔ progress currency injection and unowned equip fail; store spends and inventory use are idempotent (4.018245ms)
+✔ concurrent purchase claims grant once globally and encrypted consume outbox retries outside commit (9.702037ms)
+✔ pending, canceled, wrong-account, multi-quantity and unknown-consumed purchases never grant (2.029984ms)
+✔ delete tombstones before purge, reports Auth failure honestly, retries to completion and removes identity ciphertext (2.587766ms)
+✔ HTTP boundary requires real-token verifier, blocks client ad spin grants, and verifies signature first (29.418614ms)
+✔ global receipt marker rejects another UID even if a faulty verifier reports a changed account binding (1.772355ms)
+✔ account cleanup waits for encrypted consume work and retries rather than discarding its receipt (4.167982ms)
+✔ trusted void feed reverses unspent diamonds once, removes consume work and denies purchase replay (3.998707ms)
+✔ refund of spent diamonds records debt, blocks paid spins/store and new diamond grants repay it first (12.444496ms)
+✔ duplicate and concurrent void-feed deliveries reverse each global grant only once (2.491702ms)
+✔ unknown refunded tokens are hash-only revocations and cannot later grant from a stale PURCHASED response (0.744814ms)
+✔ a void committed while purchase verification is in flight prevents its stale grant atomically (1.219591ms)
+✔ paid spending concurrent with a refund cannot escape the wallet reversal/debt transaction (1.68933ms)
+✔ refund after account deletion never resurrects the profile or records new player debt (2.130186ms)
+✔ void polling persists bounded-page cursor, follows tokens and overlaps completed windows by 24 hours (0.789291ms)
+✔ Firestore field encoding preserves nested profiles and rejects imprecise currency numbers (0.991046ms)
+✔ ABORTED retries the complete transaction and commits profile plus global marker atomically (11.31473ms)
+✔ recursive deletion follows all collection-ID and document pages before deleting parents (0.574908ms)
+✔ REST transport bounds requests and sanitizes local fake network, JSON and ABORTED failures (29.901349ms)
+✔ Firebase verifies a signed token and rejects another project, tampering, and expired identity (5.708847ms)
+✔ AdMob verifies the exact signed query and rejects changed or appended reward data (2.886047ms)
+✔ AdMob rejects malformed or noncanonical DER before signature verification (0.224458ms)
+✔ receipt encryption round trips and detects tampering or a different encryption key (1.829782ms)
+✔ Google Play adapter scopes server OAuth and maps real purchase states with no client trust (2.632644ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 232.377069

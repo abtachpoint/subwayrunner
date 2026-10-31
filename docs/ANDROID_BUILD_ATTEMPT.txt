@@ -1,0 +1,29 @@
+Command: bash tools/build_android.sh
+Exit code: 1
+
+PASS: Required source file: web/index.html
+PASS: Required source file: web/app.js
+PASS: Required source file: web/simulation.js
+PASS: Required source file: web/renderer.js
+PASS: Required source file: web/assets/models.js
+PASS: Required source file: android/settings.gradle.kts
+PASS: Required source file: android/app/build.gradle.kts
+PASS: Required source file: android/app/src/main/AndroidManifest.xml
+PASS: Firebase configuration belongs in the application module
+PASS: Firebase project ID matches supplied owner configuration
+PASS: Firebase project number matches
+PASS: Exactly one Firebase Android client matches the final package
+PASS: Firebase Android App ID matches
+PASS: Android application uses final package identity
+PASS: Google Services plugin is applied to the application module
+BLOCKED: Supply PLAY_GAMES_APP_ID from the actual Play Games Android resource export
+LIMIT: owner upload signing is unavailable; any release AAB produced without it is unsigned and cannot be uploaded yet.
+ADS MODE: test; live rewarded delivery/SSV must be tested separately.
+PASS: Java 17+ runtime
+BLOCKED: Gradle executable
+BLOCKED: Android API 36 platform
+BLOCKED: Android build tools 36.0.0
+NOT VERIFIED: SDK compilation, Android install/runtime, upload-key authorization, live auth, purchase verification, rewarded SSV and external deletion/privacy pages.
+Preflight blocked by 4 required source/configuration/build condition(s).
+
+No AAB produced. Compilation tasks were not reached.

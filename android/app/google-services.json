@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "613238310945",
+    "project_id": "subway-runner-513217",
+    "storage_bucket": "subway-runner-513217.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:613238310945:android:a6a750a7838becef4bbb60",
+        "android_client_info": {
+          "package_name": "com.subwayrunner.bd"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByQO-LDFAgYCrDNriIStEtXrcx7caKUU8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

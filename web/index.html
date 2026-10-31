@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#112b3b">
+  <meta name="color-scheme" content="dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Subway Runner</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game" aria-label="Subway Runner 3D game"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <main id="ui"></main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="loading"><span class="loading-mark">SR</span><strong>SUBWAY RUNNER</strong><span>Warming up the city…</span></div>
+  <script src="assets/models.js"></script>
+  <script src="simulation.js"></script>
+  <script src="renderer.js"></script>
+  <script src="platform.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

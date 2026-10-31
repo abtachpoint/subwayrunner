@@ -1,0 +1,16 @@
+{
+  "build_channel": "test",
+  "test_mode": true,
+  "starting_coins": 99999,
+  "package_name": "com.subwayrunner.test2026",
+  "live_payments": false,
+  "backend_url": "",
+  "admob_app_id": "ca-app-pub-3940256099942544~3347511713",
+  "reward_ad_unit": "ca-app-pub-3940256099942544/5224354917",
+  "interstitial_ad_unit": "ca-app-pub-3940256099942544/1033173712",
+  "support_email": "",
+  "privacy_policy_url": "",
+  "developer_website_url": "",
+  "ads_minimum_age": 18,
+  "default_quality": "medium"
+}
