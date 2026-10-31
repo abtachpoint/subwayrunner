@@ -14,8 +14,10 @@
   <div class="vignette" aria-hidden="true"></div>
   <main id="ui"></main>
   <div id="toast" role="status" aria-live="polite"></div>
-  <div id="loading"><span class="loading-mark">SR</span><strong>SUBWAY RUNNER</strong><span>Warming up the city…</span></div>
+  <div id="loading" role="status" aria-live="polite"><span class="loading-mark">SR</span><strong>SUBWAY RUNNER</strong><span id="loading-status">Preparing your city…</span><div class="loading-track" aria-hidden="true"><div class="loading-bar" id="loading-bar"></div></div><span id="loading-percent">0%</span></div>
+  <script src="loader.js"></script>
   <script src="assets/models.js"></script>
+  <script src="assets/fox.js"></script>
   <script src="simulation.js"></script>
   <script src="renderer.js"></script>
   <script src="platform.js"></script>

@@ -20,15 +20,18 @@
       v ^= v + Math.imul(v ^ v >>> 7, v | 61);
       return ((v ^ v >>> 14) >>> 0) / 4294967296;
     }
-    start(seed = 1) {
+    start(seed = 1, runnerStyle = 'courier') {
       this._seed = Number(seed) >>> 0;
-      this.phase = 'running'; this.distance = 0; this.speed = 13; this.score = 0;
+      this.runner_style = ['courier','skater','sprinter','robot','astronaut','neon','fox'].includes(runnerStyle) ? runnerStyle : 'courier';
+      this.phase = 'running'; this.distance = 0; this.speed = 21; this.score = 0;
       this.coins = 0; this.lane = 0; this.player_x = 0; this.player_y = 0;
       this.vertical_velocity = 0; this.shield = 0; this.magnet = 0; this.double_score = 0;
-      this.elapsed = 0; this.shield_charges = 1; this.ground_safe_lane = 0;
+      this.elapsed = 0; this.shield_charges = this.runner_style === 'robot' ? 2 : 1; this.ground_safe_lane = 0;
+      if (this.runner_style === 'neon' || this.runner_style === 'fox') this.magnet = this.runner_style === 'fox' ? 4 : 3;
       this.jumps = 0; this.slides = 0; this.dodges = 0;
       this._objects = []; this._next_id = 1; this._next_segment = 44;
       this._segment_number = 0; this._slide_time = 0; this._grounded = true;
+      this._queued_slide = false; this._landing_time = 0;
       this._support_id = 0; this._score_accumulator = 0; this._invulnerable = 0;
       this._revived = false; this._resume_phase = 'running'; this._route = [];
       this._generated_safe_lane = 0; this._route_direction = this._random() >= 0.5 ? 1 : -1;
@@ -50,11 +53,16 @@
     jump() {
       if (this.phase !== 'running' || !this._grounded) return;
       this._grounded = false; this._support_id = 0; this._slide_time = 0;
-      this.vertical_velocity = 11.8; this.jumps++; this._emit('jump', {count:this.jumps});
+      this.vertical_velocity = this.runner_style === 'sprinter' ? 13.1 : 11.8; this.jumps++; this._emit('jump', {count:this.jumps});
     }
     slide() {
-      if (this.phase !== 'running' || !this._grounded) return;
-      this._slide_time = 0.78; this.slides++; this._emit('slide', {count:this.slides});
+      if (this.phase !== 'running') return;
+      if (!this._grounded) { // Fast-fall into a buffered roll; works on train roofs too.
+        if (!this._queued_slide) { this._queued_slide = true; this.slides++; this._emit('dive', {count:this.slides}); }
+        this.vertical_velocity = Math.min(this.vertical_velocity, -8);
+        return;
+      }
+      this._slide_time = this.runner_style === 'skater' ? 1.12 : 0.78; this.slides++; this._emit('slide', {count:this.slides});
     }
     use_shield() {
       if (this.phase !== 'running' || this.shield_charges <= 0 || this.shield > 0) return;
@@ -65,7 +73,7 @@
       if (this.phase !== 'crashed' || this._revived) return false;
       this._revived = true; this.phase = 'running'; this.player_y = 0;
       this.vertical_velocity = 0; this._grounded = true; this._support_id = 0;
-      this._slide_time = 0; this._invulnerable = 3;
+      this._slide_time = 0; this._queued_slide = false; this._landing_time = 0; this._invulnerable = 3;
       this._objects = this._objects.filter(o => o.z < -40 || o.z > o.length * 0.5 + 4);
       this._emit('revive', {distance:this.distance}); return true;
     }
@@ -77,6 +85,7 @@
       return {phase:this.phase, distance:this.distance, speed:this.speed, score:this.score,
         coins:this.coins, lane:this.lane, player_x:this.player_x, player_y:this.player_y,
         vertical_velocity:this.vertical_velocity, sliding:this._slide_time > 0,
+        diving:this._queued_slide, landing:this._landing_time,
         grounded:this._grounded, shield:this.shield, magnet:this.magnet,
         double_score:this.double_score, invulnerable:this._invulnerable, elapsed:this.elapsed,
         shield_charges:this.shield_charges, can_revive:this.phase === 'crashed' && !this._revived,
@@ -85,13 +94,15 @@
     }
     _step(dt) {
       this.elapsed += dt;
-      for (const key of ['shield','magnet','double_score','_invulnerable','_slide_time'])
+      for (const key of ['shield','magnet','double_score','_invulnerable','_slide_time','_landing_time'])
         this[key] = Math.max(0, this[key] - dt);
-      this.speed = Math.min(27, 13 + this.distance * 0.006);
+      // Immediate mid-run pace, then continuous distance-based growth without an arbitrary cap.
+      // Course spacing and lane-change responsiveness adapt to the same pace.
+      this.speed = 21 + this.distance * 0.003;
       const travel = this.speed * dt;
       this.distance += travel;
       this._score_accumulator += travel * (this.double_score > 0 ? 6 : 3);
-      this.player_x = approach(this.player_x, this.lane * 2.6, 15 * dt);
+      this.player_x = approach(this.player_x, this.lane * 2.6, (17 + this.speed * 0.30 + (this.runner_style==='courier'?2:0)) * dt);
       for (const o of this._objects) { o.previous_z = o.z; o.z += travel + (o.own_speed || 0) * dt; }
       this._update_vertical(dt); this._process_contacts();
       this.score = Math.floor(this._score_accumulator);
@@ -108,10 +119,19 @@
       this._grounded = false;
       if (this.vertical_velocity <= 0 && previous >= height - 0.08 && this.player_y <= height) {
         this.player_y = height; this.vertical_velocity = 0; this._grounded = true; this._support_id = support.id;
+        this._land();
       }
       if (this.player_y <= 0) {
+        const wasAirborne = !this._grounded;
         this.player_y = 0; this.vertical_velocity = 0; this._grounded = true; this._support_id = 0;
+        if (wasAirborne) this._land();
       }
+    }
+    _land() {
+      this._landing_time = 0.30;
+      if (this.runner_style === 'astronaut') this._invulnerable = Math.max(this._invulnerable,0.20);
+      if (this._queued_slide) { this._slide_time = this.runner_style === 'skater' ? 1.12 : 0.78; this._queued_slide = false; this._emit('roll', {count:this.slides}); }
+      else this._emit('land', {});
     }
     _find_support() {
       let height = 0, id = 0;
@@ -162,7 +182,7 @@
     _shares_lane(o, width) { return Math.abs(this.player_x - o.lane * 2.6) < width; }
     _generate_ahead() {
       while (this._next_segment < this.distance + 205) {
-        this._spawn_segment(this._next_segment); this._next_segment += 56 + this._random() * 8; this._segment_number++;
+        this._spawn_segment(this._next_segment); this._next_segment += 80 + this._random() * 8; this._segment_number++;
       }
       while (this._route.length > 1 && this.distance > this._route[0].distance + 9) this._route.shift();
       if (this._route.length) this.ground_safe_lane = this._route[0].safe_lane;
@@ -178,11 +198,26 @@
       if (variant === 0 || variant === 4) {
         const own = 9 + this._random() * 8;
         const train = this._new_object('train', hazard, z - own * Math.max(0, this._time_at_distance(at) - this.elapsed), 14, 2.7);
-        train.moving = true; train.own_speed = own; train.color_index = n % 4;
+        train.moving = true; train.own_speed = own; train.color_index = n % 3;
+        // A moving three-car metro convoy (lead car + two followers) shares
+        // one track and keeps the planned escape lane entirely clear.
+        const carCount = n % 3 === 0 ? 3 : 2;
+        train.car_index = 0; train.car_role = 'engine'; train.convoy = n;
+        for (let car = 1; car < carCount; car++) {
+          const follower = this._new_object('train', hazard, train.z - car * 17.5, 14, 2.7);
+          follower.moving = true; follower.own_speed = own; follower.color_index = n % 3;
+          follower.car_index = car; follower.car_role = 'coach'; follower.convoy = n;
+        }
         this._new_object(variant === 0 ? 'barrier' : 'lowbar', other, z, 1.1, variant === 0 ? 1.05 : 1.9);
       } else if (variant === 1 || variant === 5) {
         const train = this._new_object('train', hazard, z, 14, 2.7); train.color_index = n % 4;
         const ramp = this._new_object('ramp', hazard, z + 10.4, 7, 2.7); ramp.train_id = train.id;
+        // A second, staggered roof provides a jump/lane-transfer opportunity.
+        // The empty route lane remains available for ground-only play.
+        if (n % 2) {
+          const transfer = this._new_object('train', other, z - 16.5, 14, 2.7);
+          transfer.color_index = (n + 1) % 3; transfer.car_role = 'coach';
+        }
         this._spawn_coin_line(hazard, z + 5, 6, 2, 3.6);
         this._new_object('lowbar', other, z - 4, 1.1, 1.9);
       } else if (variant === 2) {
@@ -201,9 +236,7 @@
       }
     }
     _time_at_distance(distance) {
-      const cap = (27 - 13) / 0.006;
-      if (distance <= cap) return Math.log(1 + 0.006 * distance / 13) / 0.006;
-      return Math.log(27 / 13) / 0.006 + (distance - cap) / 27;
+      return Math.log1p(0.003 * Math.max(0, distance) / 21) / 0.003;
     }
     _spawn_coin_line(lane, z, count, spacing, height) {
       for (let i = 0; i < count; i++) this._new_object('coin', lane, z - i * spacing, 0.45, height);
@@ -213,7 +246,7 @@
       this._objects.push(o); return o;
     }
   }
-  RunnerSimulation.MAX_SPEED = 27; RunnerSimulation.ROOF_HEIGHT = 2.7; RunnerSimulation.LANE_WIDTH = 2.6;
+  RunnerSimulation.MAX_SPEED = Infinity; RunnerSimulation.START_SPEED = 21; RunnerSimulation.ROOF_HEIGHT = 2.7; RunnerSimulation.LANE_WIDTH = 2.6;
   scope.RunnerSimulation = RunnerSimulation;
   if (typeof module !== 'undefined' && module.exports) module.exports = RunnerSimulation;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

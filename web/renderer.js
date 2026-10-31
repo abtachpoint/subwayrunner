@@ -42,10 +42,11 @@ vNormal=normalize(mat3(model)*aNormal);vColor=aColor;gl_Position=uVP*world;}`;
   const FRAGMENT=`precision mediump float;
 varying vec3 vNormal;varying vec3 vWorld;varying vec4 vColor;
 uniform vec3 uEye;uniform vec4 uTint;uniform float uAlpha;
+uniform vec3 uFogColor;uniform float uFogDensity;uniform float uAmbientLevel;
 void main(){
 vec3 n=normalize(vNormal);vec3 light=normalize(vec3(-0.48,0.82,0.35));
 vec3 base=pow(max(vColor.rgb*uTint.rgb,vec3(0.001)),vec3(2.2));
-float hemi=n.y*0.5+0.5;vec3 ambient=mix(vec3(0.42,0.34,0.29),vec3(0.68,0.85,1.0),hemi)*0.72;
+float hemi=n.y*0.5+0.5;vec3 ambient=mix(vec3(0.42,0.34,0.29),vec3(0.68,0.85,1.0),hemi)*uAmbientLevel;
 float diffuse=max(dot(n,light),0.0);vec3 view=normalize(uEye-vWorld);
 float spec=pow(max(dot(n,normalize(light+view)),0.0),mix(24.0,64.0,vColor.a));
 float rim=pow(1.0-max(dot(n,view),0.0),3.0)*0.07;
@@ -55,19 +56,19 @@ float fog=1.0-exp(-max(0.0,-vWorld.z-20.0)*0.008);
 color=mix(color,vec3(0.88,0.82,0.74),min(0.94,fog));
 gl_FragColor=vec4(color,uAlpha);}`;
   const SKY_V=`attribute vec2 p;varying vec2 uv;void main(){uv=p*0.5+0.5;gl_Position=vec4(p,0.999,1.0);}`;
-  const SKY_F=`precision mediump float;varying vec2 uv;void main(){float t=smoothstep(0.42,1.0,uv.y);vec3 c=mix(vec3(0.96,0.83,0.70),vec3(0.31,0.71,0.90),t);gl_FragColor=vec4(c,1.0);}`;
+  const SKY_F=`precision mediump float;varying vec2 uv;uniform vec3 uHorizon;uniform vec3 uZenith;uniform float uSunStrength;void main(){float t=smoothstep(0.32,1.0,uv.y);vec3 c=mix(uHorizon,uZenith,t);float sunlight=1.0-smoothstep(0.035,0.19,length((uv-vec2(0.80,0.77))*vec2(1.0,1.3)));c+=vec3(1.0,0.73,0.43)*sunlight*uSunStrength*0.20;gl_FragColor=vec4(c,1.0);}`;
   const SHADOW_V=`attribute vec2 p;uniform mat4 vp;uniform mat4 model;varying vec2 uv;void main(){uv=p;gl_Position=vp*model*vec4(p.x,0.0,p.y,1.0);}`;
   const SHADOW_F=`precision mediump float;varying vec2 uv;uniform float opacity;void main(){float a=(1.0-smoothstep(0.1,1.0,length(uv)))*opacity;gl_FragColor=vec4(0.08,0.12,0.14,a);}`;
   class RunnerRenderer{
     constructor(canvas,assets){
       if(!canvas||!assets||assets.version!==1||assets.stride!==16)throw Error('The city model is incomplete.');
-      this.canvas=canvas;this.assets=assets;this.quality='medium';this.clock=0;this.phase=0;this.speedBlend=0;this.slideBlend=0;this.airBlend=0;this.lean=0;this.turn=0;this.prevX=0;this.cameraY=4.8;this.cameraX=0;
+      this.canvas=canvas;this.assets=assets;this.quality='medium';this.clock=0;this.phase=0;this.speedBlend=0;this.slideBlend=0;this.airBlend=0;this.lean=0;this.turn=0;this.prevX=0;this.cameraY=4.8;this.cameraX=0;this.cameraZ=8.2;this.landBlend=0;this.currentDistrict=-1;
       const gl=this.gl=canvas.getContext('webgl',{alpha:false,antialias:false,depth:true,stencil:false,powerPreference:'high-performance'})||canvas.getContext('experimental-webgl',{alpha:false,antialias:false});
       if(!gl)throw Error('This device needs a WebGL-enabled Android WebView.');
       this.instancing=gl.getExtension('ANGLE_instanced_arrays');
       this.program=this._program(VERTEX,FRAGMENT,{aPosition:0,aNormal:1,aColor:2,aI0:3,aI1:4,aI2:5,aI3:6});
-      this.uniform={};for(const name of ['uVP','uModel','uInstanced','uEye','uTint','uAlpha'])this.uniform[name]=gl.getUniformLocation(this.program,name);
-      this.sky=this._program(SKY_V,SKY_F,{p:0});this.shadow=this._program(SHADOW_V,SHADOW_F,{p:0});
+      this.uniform={};for(const name of ['uVP','uModel','uInstanced','uEye','uTint','uAlpha','uFogColor','uFogDensity','uAmbientLevel'])this.uniform[name]=gl.getUniformLocation(this.program,name);
+      this.sky=this._program(SKY_V,SKY_F,{p:0});this.skyU={horizon:gl.getUniformLocation(this.sky,'uHorizon'),zenith:gl.getUniformLocation(this.sky,'uZenith'),sun:gl.getUniformLocation(this.sky,'uSunStrength')};this.shadow=this._program(SHADOW_V,SHADOW_F,{p:0});
       this.shadowU={vp:gl.getUniformLocation(this.shadow,'vp'),model:gl.getUniformLocation(this.shadow,'model'),opacity:gl.getUniformLocation(this.shadow,'opacity')};
       this.quad=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.quad);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
       this.identity=identity(new Float32Array(16));this.model=new Float32Array(16);this.local=new Float32Array(16);this.root=new Float32Array(16);this.view=new Float32Array(16);this.projection=new Float32Array(16);this.vp=new Float32Array(16);
@@ -84,21 +85,41 @@ gl_FragColor=vec4(color,uAlpha);}`;
     _draw(mesh,matrix){if(!mesh)return;this._bind(mesh);this.gl.uniformMatrix4fv(this.uniform.uModel,false,matrix);this.gl.drawArrays(this.gl.TRIANGLES,0,mesh.count);this.lastStats.drawCalls++;this.lastStats.vertices+=mesh.count;}
     setQuality(value){this.quality=['low','medium','high'].includes(value)?value:'medium';this.resize();}
     resize(){const cssW=Math.max(1,this.canvas.clientWidth||global.innerWidth||450),cssH=Math.max(1,this.canvas.clientHeight||global.innerHeight||800);let ratio=Math.min(global.devicePixelRatio||1,this.quality==='high'?2:this.quality==='medium'?1.5:1);const cap=this.quality==='high'?1500000:this.quality==='medium'?750000:420000;ratio=Math.min(ratio,Math.sqrt(cap/(cssW*cssH)));const w=Math.max(1,Math.floor(cssW*ratio)),h=Math.max(1,Math.floor(cssH*ratio));if(this.canvas.width!==w)this.canvas.width=w;if(this.canvas.height!==h)this.canvas.height=h;this.gl.viewport(0,0,w,h);perspective(this.projection,66*PI/180,w/h,.1,205);}
-    _setupMeshProgram(){const gl=this.gl;gl.useProgram(this.program);gl.uniformMatrix4fv(this.uniform.uVP,false,this.vp);gl.uniform3f(this.uniform.uEye,this.cameraX,this.cameraY,8.2);gl.uniform4f(this.uniform.uTint,1,1,1,1);gl.uniform1f(this.uniform.uAlpha,1);this._regular();}
+    _setupMeshProgram(){const gl=this.gl;gl.useProgram(this.program);gl.uniformMatrix4fv(this.uniform.uVP,false,this.vp);gl.uniform3f(this.uniform.uEye,this.cameraX,this.cameraY,this.cameraZ);gl.uniform4f(this.uniform.uTint,1,1,1,1);gl.uniform1f(this.uniform.uAlpha,1);gl.uniform3fv(this.uniform.uFogColor,this.district.fog);gl.uniform1f(this.uniform.uFogDensity,this.district.density);gl.uniform1f(this.uniform.uAmbientLevel,this.district.ambient);this._regular();}
+    _district(distance){
+      // Same immutable original models, with a gentle sequence of lighting
+      // districts that follows actual distance rather than arbitrary time.
+      const zones=[
+        {name:'SUNRISE CITY',horizon:[.96,.81,.68],zenith:[.34,.69,.91],fog:[.84,.81,.76],density:.008,ambient:.78,sun:.86,tint:[1,1,1]},
+        {name:'GREEN LINE',horizon:[.81,.93,.74],zenith:[.31,.73,.86],fog:[.65,.85,.73],density:.010,ambient:.79,sun:.75,tint:[.92,1.03,.93]},
+        {name:'GOLDEN TERMINAL',horizon:[1.0,.71,.50],zenith:[.56,.48,.72],fog:[.91,.69,.58],density:.012,ambient:.68,sun:1,tint:[1.06,.94,.90]},
+        {name:'NEON NIGHT',horizon:[.37,.40,.65],zenith:[.09,.17,.35],fog:[.32,.38,.55],density:.014,ambient:.70,sun:.2,tint:[.85,.91,1.11]}
+      ];
+      const position=Math.max(0,Number(distance)||0)/1100,part=Math.floor(position),t=position-part;
+      // Fade in the next skyline only near the end of each neighborhood.
+      const blend=t<=.78?0:(t-.78)/.22,b=blend*blend*(3-2*blend);
+      const a=zones[part%zones.length],c=zones[(part+1)%zones.length],mix=(x,y)=>x+(y-x)*b;
+      const blendVec=(x,y)=>x.map((v,i)=>mix(v,y[i]));
+      this.district={name:a.name,horizon:blendVec(a.horizon,c.horizon),zenith:blendVec(a.zenith,c.zenith),fog:blendVec(a.fog,c.fog),density:mix(a.density,c.density),ambient:mix(a.ambient,c.ambient),sun:mix(a.sun,c.sun),tint:blendVec(a.tint,c.tint)};
+      return this.district;
+    }
+
     _shadow(x,y,z,sx,sz,opacity){const gl=this.gl;transform(this.model,x,y,z,0,0,0,sx,1,sz);gl.uniformMatrix4fv(this.shadowU.model,false,this.model);gl.uniform1f(this.shadowU.opacity,opacity);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);this.lastStats.drawCalls++;}
     _character(style,state,dt){
       style=this.assets.characters[style]?style:'courier';let actor=this.characters[style];
       if(!actor){actor=this.characters[style]={bones:this.assets.characters[style].bones.map(b=>({source:b,mesh:this._mesh(b.mesh),world:new Float32Array(16)}))};}
       const active=state.phase==='running',speed=active?Number(state.speed)||13:0;
       this.speedBlend+=(speed-this.speedBlend)*(1-Math.exp(-12*dt));this.phase=mod(this.phase+this.speedBlend*dt*.73,TAU);
-      this.slideBlend+=((state.sliding?1:0)-this.slideBlend)*(1-Math.exp(-22*dt));this.airBlend+=((Math.abs(state.vertical_velocity||0)>.15?1:0)-this.airBlend)*(1-Math.exp(-15*dt));
+      this.slideBlend+=(((state.sliding||state.diving)?1:0)-this.slideBlend)*(1-Math.exp(-22*dt));this.airBlend+=((Math.abs(state.vertical_velocity||0)>.15?1:0)-this.airBlend)*(1-Math.exp(-15*dt));
+      this.landBlend+=((Number(state.landing)>0?1:0)-this.landBlend)*(1-Math.exp(-17*dt));
       const x=Number(state.player_x)||0,y=Number(state.player_y)||0,lateral=(x-this.prevX)/Math.max(dt,.001);this.prevX=x;
       this.lean+=(clamp(-lateral*.018,-.15,.15)-this.lean)*(1-Math.exp(-16*dt));this.turn+=(clamp(-lateral*.025,-.25,.25)-this.turn)*(1-Math.exp(-10*dt));
       const run=clamp(this.speedBlend/8,0,1),gait=run*(1-this.airBlend)*(1-this.slideBlend),slide=this.slideBlend,air=this.airBlend;
-      transform(this.root,x,y,0);
+      const showcase=!!this.showcase;
+      transform(this.root,x,y,0,0,showcase?Math.sin(this.clock*.55)*.22:0,0);
       for(let i=0;i<actor.bones.length;i++){
         const bone=actor.bones[i],b=bone.source;let px=b.p[0],py=b.p[1],pz=b.p[2],rx=b.r[0],ry=b.r[1],rz=b.r[2],sx=b.s[0],sy=b.s[1],sz=b.s[2];
-        if(i===0){py+=Math.abs(Math.sin(this.phase))*.045*gait-slide*.25;rz+=this.lean;ry+=this.turn;sy*=1-slide*.36;}
+        if(i===0){py+=Math.abs(Math.sin(this.phase))*.045*gait-slide*.25-this.landBlend*.09+(showcase?Math.sin(this.clock*2)*.025:0);rz+=this.lean;ry+=this.turn;sy*=1-slide*.36-this.landBlend*.08;}
         else if(i===1){rx+=-.09*run-slide*.60-air*.10;ry+=Math.sin(this.phase)*.045*gait;}
         else if(i===2)rx+=slide*.40+air*.04;
         else{
@@ -112,21 +133,25 @@ gl_FragColor=vec4(color,uAlpha);}`;
         transform(this.local,px,py,pz,rx,ry,rz,sx,sy,sz);multiply(bone.world,b.parent<0?this.root:actor.bones[b.parent].world,this.local);this._draw(bone.mesh,bone.world);
       }
     }
-    render(state,delta,style='courier'){
+    render(state,delta,style='courier',showcase=false){
       if(this.lost)throw Error('Graphics were interrupted. Restart the game to restore the city.');
-      const gl=this.gl,dt=clamp(Number(delta)||0,0,.075);this.clock+=state.phase==='paused'?0:dt;
+      const gl=this.gl,dt=clamp(Number(delta)||0,0,.075);this.showcase=showcase;this.clock+=state.phase==='paused'&&!showcase?0:dt;
       this.lastStats.drawCalls=0;this.lastStats.vertices=0;this.lastStats.objects=0;
       const playerY=Number(state.player_y)||0,playerX=Number(state.player_x)||0;
-      this.cameraY+=(4.8+playerY*.40-this.cameraY)*(1-Math.exp(-5*dt));this.cameraX+=(playerX*.13-this.cameraX)*(1-Math.exp(-4*dt));
-      lookAt(this.view,this.cameraX,this.cameraY,8.2,this.cameraX,1.1+playerY*.15,-11);multiply(this.vp,this.projection,this.view);
+      this.cameraY+=((showcase?3.1:4.8+playerY*.40)-this.cameraY)*(1-Math.exp(-5*dt));this.cameraX+=(playerX*.13-this.cameraX)*(1-Math.exp(-4*dt));
+      this.cameraZ+=((showcase?5.8:8.2)-this.cameraZ)*(1-Math.exp(-6*dt));
+      lookAt(this.view,this.cameraX,this.cameraY,this.cameraZ,this.cameraX,showcase?1.25:1.1+playerY*.15,showcase?0:-11);multiply(this.vp,this.projection,this.view);
+      const district=this._district(state.distance||0);
       gl.clearColor(.65,.80,.87,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.disable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);gl.disable(gl.BLEND);
-      gl.useProgram(this.sky);gl.bindBuffer(gl.ARRAY_BUFFER,this.quad);for(let i=1;i<=6;i++)gl.disableVertexAttribArray(i);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+      gl.useProgram(this.sky);gl.uniform3fv(this.skyU.horizon,district.horizon);gl.uniform3fv(this.skyU.zenith,district.zenith);gl.uniform1f(this.skyU.sun,district.sun);gl.bindBuffer(gl.ARRAY_BUFFER,this.quad);for(let i=1;i<=6;i++)gl.disableVertexAttribArray(i);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
       gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.depthMask(true);
       // Godot mesh front faces wind clockwise. Double-sided rendering also
       // keeps thin flags, leaves and paired ramp panels visible from both sides.
       gl.disable(gl.CULL_FACE);this._setupMeshProgram();this._draw(this.track,this.identity);
       const distance=Number(state.distance)||0;
+      gl.uniform4f(this.uniform.uTint,...district.tint,1);
       for(let i=0;i<this.chunks.length;i++){const z=mod(distance-i*24+24,192)-192+24;transform(this.model,0,0,z);this._draw(this.chunks[i],this.model);}
+      gl.uniform4f(this.uniform.uTint,1,1,1,1);
       // Soft planar contact shadows; no costly full-scene shadow maps.
       gl.useProgram(this.shadow);gl.bindBuffer(gl.ARRAY_BUFFER,this.quad);gl.enableVertexAttribArray(0);for(let i=1;i<=6;i++)gl.disableVertexAttribArray(i);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);gl.uniformMatrix4fv(this.shadowU.vp,false,this.vp);
       gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);

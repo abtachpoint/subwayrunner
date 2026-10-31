@@ -1,0 +1,7 @@
+# Local-only placeholders. Copy to .dev.vars and supply owner credentials locally.
+GOOGLE_SERVICE_ACCOUNT_EMAIL="replace-with-service-account@subway-runner-513217.iam.gserviceaccount.com"
+GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nREPLACE_WITH_OWNER_KEY\n-----END PRIVATE KEY-----\n"
+LEDGER_ENCRYPTION_KEY="REPLACE_WITH_BASE64_32_RANDOM_BYTES"
+# Set the complete production unit IDs; only these signed units may grant.
+ADMOB_REVIVE_AD_UNIT="ca-app-pub-1379059201302335/6015873225"
+ADMOB_SPIN_AD_UNIT="ca-app-pub-1379059201302335/7963379715"

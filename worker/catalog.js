@@ -2,7 +2,8 @@ export const PRODUCTS = Object.freeze({diamonds_100:100,diamonds_500:500,diamond
 export const STYLES = Object.freeze([
  {id:'courier',name:'Kai',currency:'free',cost:0},{id:'skater',name:'Mira',currency:'free',cost:0},
  {id:'sprinter',name:'Zuri',currency:'coins',cost:1200},{id:'robot',name:'Bolt',currency:'coins',cost:3500},
- {id:'astronaut',name:'Nova',currency:'diamonds',cost:100},{id:'neon',name:'Flux',currency:'diamonds',cost:150}
+ {id:'astronaut',name:'Nova',currency:'diamonds',cost:100},{id:'neon',name:'Flux',currency:'diamonds',cost:150},
+ {id:'fox',name:'Fenn',currency:'coins',cost:2800}
 ]);
 export const ITEMS = Object.freeze([{id:'magnet',currency:'coins',cost:150},{id:'shield',currency:'coins',cost:200},{id:'coins_1000',currency:'diamonds',cost:10}]);
 // No previous shipped spin table existed. These versioned launch odds are public

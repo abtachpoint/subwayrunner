@@ -1,7 +1,20 @@
+
+## Latest release-target gameplay and graphics update (31 October 2026)
+
+**This ZIP is a full project source package, not a signed APK/AAB.** It includes the
+requested enhanced 3D WebGL renderer, moving train convoys, original Fenn fox
+runner, age slider, gameplay/animation/audio improvements, and the pre-existing
+Firebase/Play Games/AdMob/Billing/Cloudflare integration code.
+
+For an accurate implementation-by-feature report and production blockers, see
+[`docs/FINAL_RELEASE_PROGRESS.md`](docs/FINAL_RELEASE_PROGRESS.md).
+Graphics must still be validated on a real Android device after building.
+
 # Subway Runner — consolidated Android project
 
-This update preserves the existing delivered **WebGL/WebView game**. The course,
-renderer and original city/character geometry remain byte-for-byte unchanged.
+This update preserves the existing delivered **WebGL/WebView game**. The baked original city/character **geometry** remains byte-for-byte unchanged,
+while the course simulation, shaders, UI, audio and character roster have been
+intentionally improved for this release target.
 The active build is the standard Android `:app` module. Earlier `game/` Godot
 sources and `android/services/` are retained legacy development work, excluded
 from the active Android application.
@@ -16,8 +29,8 @@ The owner-verified Play Games app_id **613238310945** is already configured in
 the Android manifest. It is distinct from the full OAuth client IDs.
 
 No GitHub remote or Codemagic account connection is available in this workspace.
-Use `release/Subway-Runner-Codemagic-ready.zip`: its files are at ZIP/repository
-root, including `codemagic.yaml`. Extract and upload the contents to GitHub,
+Use the provided `Subway-Runner-Final-Upgrade-Codemagic-Source.zip`: its
+files are at ZIP/repository root, including `codemagic.yaml`. Extract and upload the contents to GitHub,
 connect that repository in Codemagic, and register the existing authorized upload
 keystore with reference `subway_runner_upload`. Then run `android-internal`.
 
@@ -61,8 +74,9 @@ devices in AdMob before testing the installed release.
   Signed AdMob SSV must match a server-issued intent, player, unit and live run.
 - Refund/void polling, atomic reversal/debt and duplicate protection; account
   deletion tombstones, data cleanup, recent reauthentication and retryable jobs.
-- Existing runners, normal coin shop, inventory, controls, animations and audio
-  retained; no 99,999 test balance is imported into a paid production account.
+- Original runners, coins, inventory and controls are retained, with a new rigged fox runner,
+  district lighting, enhanced motion/audio and safer, richer UI. No 99,999 test balance
+  is imported into a paid production account.
 - Privacy, consent and deletion UI access. Public policy/deletion replacement
   sources are in `public-info/`; they have NOT been deployed to the supplied URLs.
 

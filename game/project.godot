@@ -6,7 +6,7 @@ config/name="Subway Runner"
 config/version="0.2.0-test"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.6", "GL Compatibility")
-config/icon="res://assets/icon.png"
+config/icon="res://assets/icon.svg"
 
 [display]
 window/size/viewport_width=450
