@@ -61,7 +61,7 @@ jobs:
               print('No owner upload keystore supplied; internal bundle will be unsigned and cannot be uploaded yet.')
           PY
       - name: Test existing game and new bridge/economy logic
-        run: node --test --test-isolation=none tests/*.test.cjs
+        run: node --test tests/*.test.cjs
       - name: Test worker security and economy
         working-directory: worker
         run: npm test

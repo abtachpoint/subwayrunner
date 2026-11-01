@@ -53,7 +53,7 @@
     jump() {
       if (this.phase !== 'running' || !this._grounded) return;
       this._grounded = false; this._support_id = 0; this._slide_time = 0;
-      this.vertical_velocity = this.runner_style === 'sprinter' ? 13.1 : 11.8; this.jumps++; this._emit('jump', {count:this.jumps});
+      this.vertical_velocity = this.runner_style === 'sprinter' ? 16.1 : 15.0; this.jumps++; this._emit('jump', {count:this.jumps});
     }
     slide() {
       if (this.phase !== 'running') return;
@@ -111,6 +111,11 @@
     }
     _update_vertical(dt) {
       const support = this._find_support(), height = support.height;
+      // Step smoothly onto ramps. Train roofs require a jump or ramp traversal;
+      // never teleport a ground runner through the side of a moving train.
+      if (this._grounded && support.kind === 'ramp' && this.player_y <= height + 0.15) {
+        this.player_y = height; this.vertical_velocity = 0; this._support_id = support.id; return;
+      }
       if (this._grounded && Math.abs(this.player_y - height) < 0.42) {
         this.player_y = height; this.vertical_velocity = 0; this._support_id = support.id; return;
       }
@@ -134,13 +139,15 @@
       else this._emit('land', {});
     }
     _find_support() {
-      let height = 0, id = 0;
+      let height = 0, id = 0, kind = 'ground';
       for (const o of this._objects) {
         if (o.removed || !this._shares_lane(o, 0.93) || !['ramp','train'].includes(o.kind) || Math.abs(o.z) > o.length * 0.5) continue;
         const top = o.kind === 'ramp' ? clamp((o.z + o.length * 0.5) / o.length, 0, 1) * 2.7 : 2.7;
-        if (top > height && (this.player_y >= top - 0.42 || this._support_id === o.id)) { height = top; id = o.id; }
+        const reachable = o.kind === 'ramp' && this._grounded ||
+          this.player_y >= top - 0.42 || this._support_id === o.id;
+        if (top > height && reachable) { height = top; id = o.id; kind = o.kind; }
       }
-      return {height, id};
+      return {height, id, kind};
     }
     _process_contacts() {
       for (const o of this._objects) {
@@ -182,7 +189,7 @@
     _shares_lane(o, width) { return Math.abs(this.player_x - o.lane * 2.6) < width; }
     _generate_ahead() {
       while (this._next_segment < this.distance + 205) {
-        this._spawn_segment(this._next_segment); this._next_segment += 80 + this._random() * 8; this._segment_number++;
+        this._spawn_segment(this._next_segment); this._next_segment += 73 + this._random() * 10; this._segment_number++;
       }
       while (this._route.length > 1 && this.distance > this._route[0].distance + 9) this._route.shift();
       if (this._route.length) this.ground_safe_lane = this._route[0].safe_lane;
@@ -195,39 +202,37 @@
       this._route.push({distance:at, safe_lane:safe});
       const lanes = [-1, 0, 1].filter(l => l !== safe), n = this._segment_number;
       const hazard = lanes[n % 2], other = lanes[1 - n % 2], variant = n % 6;
-      if (variant === 0 || variant === 4) {
-        const own = 9 + this._random() * 8;
-        const train = this._new_object('train', hazard, z - own * Math.max(0, this._time_at_distance(at) - this.elapsed), 14, 2.7);
-        train.moving = true; train.own_speed = own; train.color_index = n % 3;
-        // A moving three-car metro convoy (lead car + two followers) shares
-        // one track and keeps the planned escape lane entirely clear.
-        const carCount = n % 3 === 0 ? 3 : 2;
+      if (variant === 0 || variant === 2 || variant === 4) {
+        // Frequent moving trains: a lead engine and two coaches in one lane.
+        // Keep the planned safe ground lane accessible for all players.
+        const own = 3 + this._random() * 4;
+        const train = this._new_object('train', hazard, z, 14, 2.7);
+        train.moving = true; train.own_speed = own; train.color_index = n % 9;
         train.car_index = 0; train.car_role = 'engine'; train.convoy = n;
-        for (let car = 1; car < carCount; car++) {
-          const follower = this._new_object('train', hazard, train.z - car * 17.5, 14, 2.7);
-          follower.moving = true; follower.own_speed = own; follower.color_index = n % 3;
+        for (let car = 1; car < 3; car++) {
+          const follower = this._new_object('train', hazard, z - car * 15.8, 14, 2.7);
+          follower.moving = true; follower.own_speed = own;
+          follower.color_index = (n + car) % 9;
           follower.car_index = car; follower.car_role = 'coach'; follower.convoy = n;
         }
-        this._new_object(variant === 0 ? 'barrier' : 'lowbar', other, z, 1.1, variant === 0 ? 1.05 : 1.9);
-      } else if (variant === 1 || variant === 5) {
-        const train = this._new_object('train', hazard, z, 14, 2.7); train.color_index = n % 4;
-        const ramp = this._new_object('ramp', hazard, z + 10.4, 7, 2.7); ramp.train_id = train.id;
-        // A second, staggered roof provides a jump/lane-transfer opportunity.
-        // The empty route lane remains available for ground-only play.
-        if (n % 2) {
-          const transfer = this._new_object('train', other, z - 16.5, 14, 2.7);
-          transfer.color_index = (n + 1) % 3; transfer.car_role = 'coach';
-        }
-        this._spawn_coin_line(hazard, z + 5, 6, 2, 3.6);
-        this._new_object('lowbar', other, z - 4, 1.1, 1.9);
-      } else if (variant === 2) {
-        this._new_object('barrier', hazard, z, 1.2, 1.05);
-        this._new_object('lowbar', other, z - 7, 1.1, 1.9);
-        this._spawn_coin_line(hazard, z - 6, 5, 2, 0.95);
+        if (variant === 4) {
+          // A stopped parallel train increases density without blocking safe lane.
+          const station = this._new_object('train', other, z - 16, 14, 2.7);
+          station.color_index = (n + 2) % 9;
+          const ramp = this._new_object('ramp', other, station.z + 10, 7, 2.7);
+          ramp.train_id = station.id;
+        } else this._spawn_coin_line(other,z-2,3,2.5,0.95);
       } else {
-        this._new_object('lowbar', hazard, z, 1.1, 1.9);
-        this._new_object('barrier', other, z - 6, 1.2, 1.05);
-        this._spawn_coin_line(other, z - 11, 5, 2, 0.95);
+        // Stopped train, with a traversable ramp on its approach and coins on top.
+        const train = this._new_object('train', hazard, z, 14, 2.7);
+        train.color_index = n % 9; train.car_role = 'engine';
+        const ramp = this._new_object('ramp', hazard, z + 10.4, 7, 2.7);
+        ramp.train_id = train.id;
+        this._spawn_coin_line(hazard, z + 1, 5, 2.5, 3.55);
+        if (variant===3 || variant===5) {
+          const transfer = this._new_object('train', other, z - 15, 14, 2.7);
+          transfer.color_index = (n + 1) % 9; transfer.car_role = 'coach';
+        } else this._new_object('lowbar', other, z - 4, 1.1, 1.9);
       }
       this._spawn_coin_line(safe, z - 4, 4, 3, 0.95);
       if (n % 4 === 2) {

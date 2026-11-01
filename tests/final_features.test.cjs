@@ -51,9 +51,9 @@ test('running styles have independent predictable movement specialities',()=>{
 test('district shaders and graphics settings preserve base 3D models',()=>{
  const context={window:{}};vm.runInNewContext(fs.readFileSync(path.join(root,'web/renderer.js'),'utf8'),context);
  const renderer=Object.create(context.window.RunnerRenderer.prototype);
- const names=[0,1100,2200,3300].map(d=>renderer._district(d).name);
+ const names=[0,350,700,1050].map(d=>renderer._district(d).name);
  assert.deepEqual(names,['SUNRISE CITY','GREEN LINE','GOLDEN TERMINAL','NEON NIGHT']);
- assert.ok(renderer._district(3280).fog.every(v=>v>=0&&v<=1));
+ assert.ok(renderer._district(1030).fog.every(v=>v>=0&&v<=1));
  const stylesheet=fs.readFileSync(path.join(root,'web/style.css'),'utf8');
  for(const klass of ['runner-showcase','age-slider','crash-burst','loading-bar'])assert.ok(stylesheet.includes(klass));
 });

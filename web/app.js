@@ -2,6 +2,8 @@
   'use strict';
   const SAVE_KEY = 'subway-runner-player-v3';
   const LEGACY_SAVE_KEY = 'subway-runner-local-test-v2';
+  const AGE_KEY = 'subway-runner-confirmed-age-group-v1';
+  function savedAge(){try{const v=localStorage.getItem(AGE_KEY);return ['under13','teen','adult'].includes(v)?v:'unknown';}catch(_){return 'unknown';}}
   const platform = window.RunnerPlatform || {available:()=>false,id:()=>Date.now().toString(36),call:()=>Promise.reject(new Error('Android services unavailable. Guest play is available.'))};
   const DIAMOND_PRODUCTS = [{id:'diamonds_100',diamonds:100},{id:'diamonds_500',diamonds:500},{id:'diamonds_1200',diamonds:1200},{id:'diamonds_2500',diamonds:2500}];
   const STYLES = [
@@ -14,7 +16,7 @@
     {id:'fox',name:'Fenn',subtitle:'Fox runner · Treasure Sense',accent:'#ff9859',type:'coins',cost:2800}
   ];
   const ui = document.getElementById('ui'), canvas = document.getElementById('game');
-  let sim, renderer, profile, screen = 'age', age = 'unknown', preview = '', tab = 'characters';
+  let sim, renderer, profile, screen = 'age', age = savedAge(), preview = '', tab = 'characters';
   let runId = '', banked = true, crashDelay = -1, settingsReturn = 'menu', lastFrame = 0;
   let pointer = null, lastTap = -10000, toastTimer = 0, animationId = 0;
   let hudRefs = null, renderErrorShown = false, screenGeneration = 0;
@@ -25,8 +27,13 @@
   const format = n => Math.max(0,Math.floor(Number(n)||0)).toLocaleString('en-US');
   const text = (tag, value, className) => {const e=document.createElement(tag);e.textContent=value;if(className)e.className=className;return e;};
   const box = (className, ...children) => {const e=document.createElement('div');e.className=className;children.filter(Boolean).forEach(c=>e.appendChild(c));return e;};
-  const button = (label, fn, type='') => {const b=text('button',label,'btn '+type);b.type='button';b.addEventListener('click',e=>{e.stopPropagation();sound.unlock();fn();});return b;};
-  const defaults = () => ({version:3,wallet:0,highScore:0,bestDistance:0,runs:0,totalDistance:0,selected:'courier',unlocked:['courier','skater'],processed:[],settings:{quality:'medium',music:true,sfx:true,tap:false}});
+  const button = (label, fn, type='') => {const b=text('button',label,'btn '+type);b.type='button';b.addEventListener('click',e=>{e.stopPropagation();sound.unlock();sound.effect('button');if(profile&&profile.settings.haptics&&navigator.vibrate)navigator.vibrate(12);fn();});return b;};
+  const iconButton=(asset,label,fn,type='')=>{
+    const b=button(label,fn,type+' illustrated-button');
+    b.textContent='';const img=document.createElement('img');img.src='icons/'+asset+'.png';img.alt='';img.className='ui-icon';
+    b.append(img,text('span',label));return b;
+  };
+  const defaults = () => ({version:3,wallet:0,highScore:0,bestDistance:0,runs:0,totalDistance:0,selected:'courier',unlocked:['courier','skater'],processed:[],settings:{quality:'medium',music:true,sfx:true,tap:false,haptics:true,musicVolume:.58,sfxVolume:.85}});
   function load() {
     const p=defaults();
     try {const v=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');if(v&&v.version===3){
@@ -34,8 +41,8 @@
       if(Array.isArray(v.unlocked))for(const id of v.unlocked)if(['sprinter','robot','fox'].includes(id)&&!p.unlocked.includes(id))p.unlocked.push(id);
       if(p.unlocked.includes(v.selected))p.selected=v.selected;
       if(Array.isArray(v.processed))p.processed=v.processed.filter(x=>typeof x==='string').slice(-256);
-      if(v.settings){if(['low','medium','high'].includes(v.settings.quality))p.settings.quality=v.settings.quality;for(const k of ['music','sfx','tap'])if(typeof v.settings[k]==='boolean')p.settings[k]=v.settings[k];}
-    }else{const legacy=JSON.parse(localStorage.getItem(LEGACY_SAVE_KEY)||'null');if(legacy&&legacy.version===2){for(const k of ['highScore','runs','bestDistance','totalDistance'])if(Number.isFinite(legacy[k]))p[k]=Math.max(0,legacy[k]);if(legacy.settings){if(['low','medium','high'].includes(legacy.settings.quality))p.settings.quality=legacy.settings.quality;for(const k of ['music','sfx','tap'])if(typeof legacy.settings[k]==='boolean')p.settings[k]=legacy.settings[k];}if(Array.isArray(legacy.unlocked))for(const id of legacy.unlocked)if(['sprinter','robot','fox'].includes(id)&&!p.unlocked.includes(id))p.unlocked.push(id);if(p.unlocked.includes(legacy.selected))p.selected=legacy.selected;p.legacyAvailable=true;}}}catch(_e){}
+      if(v.settings){if(['low','medium','high'].includes(v.settings.quality))p.settings.quality=v.settings.quality;for(const k of ['music','sfx','tap','haptics'])if(typeof v.settings[k]==='boolean')p.settings[k]=v.settings[k];for(const k of ['musicVolume','sfxVolume'])if(Number.isFinite(v.settings[k]))p.settings[k]=Math.max(0,Math.min(1,v.settings[k]));}
+    }else{const legacy=JSON.parse(localStorage.getItem(LEGACY_SAVE_KEY)||'null');if(legacy&&legacy.version===2){for(const k of ['highScore','runs','bestDistance','totalDistance'])if(Number.isFinite(legacy[k]))p[k]=Math.max(0,legacy[k]);if(legacy.settings){if(['low','medium','high'].includes(legacy.settings.quality))p.settings.quality=legacy.settings.quality;for(const k of ['music','sfx','tap','haptics'])if(typeof legacy.settings[k]==='boolean')p.settings[k]=legacy.settings[k];}if(Array.isArray(legacy.unlocked))for(const id of legacy.unlocked)if(['sprinter','robot','fox'].includes(id)&&!p.unlocked.includes(id))p.unlocked.push(id);if(p.unlocked.includes(legacy.selected))p.selected=legacy.selected;p.legacyAvailable=true;}}}catch(_e){}
     return p;
   }
   function save(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(profile));}catch(_e){toast('Progress could not be saved on this device.');}}
@@ -120,7 +127,7 @@
   }
   async function spin(source){if(!canTransact()||!Array.isArray(serverCatalog.spin_outcomes)||!serverCatalog.spin_outcomes.length||source==='ad'&&age!=='adult')return;
     if(source==='ad')return perform('spin:ad','reward',{placement:'spin'},result=>{if(result.status!=='granted')toast('Reward verification is pending. Check again without watching another ad.');});
-    return perform('spin:'+source,'spin',{source},result=>{if(result.reward)toast('You received '+outcomeLabel(result.reward)+'.');});
+    return perform('spin:'+source,'spin',{source},result=>{if(result.reward){toast('You received '+outcomeLabel(result.reward)+'.');if(result.reward.kind==='multiplier'||result.reward.type==='multiplier')showMultiplierReward(Number(result.reward.amount)||1);}});
   }
   async function checkRewards(){await platform.call('reward_refresh').catch(report);toast('Checking pending reward verification.');}
   function handleReward(result,entry,key){
@@ -131,7 +138,7 @@
     if(result.status==='granted'){
       applyServer(result);
       if(entry.params.placement==='revive'&&result.run_id===entry.params.run_id&&serverRunId===result.run_id&&serverRunLocalId===runId&&!banked&&age==='adult'&&sim.phase==='crashed'&&state().can_revive){if(sim.revive()){showRunning();sound.effect('powerup');}}
-      else if(entry.params.placement==='spin'&&result.reward)toast('You received '+outcomeLabel(result.reward)+'.');
+      else if(entry.params.placement==='spin'&&result.reward){toast('You received '+outcomeLabel(result.reward)+'.');if(result.reward.kind==='multiplier'||result.reward.type==='multiplier')showMultiplierReward(Number(result.reward.amount)||1);}
     }
     clearPending(key);
   }
@@ -139,9 +146,44 @@
     const local=runId,remote=serverRunId;await perform('use:'+local+':'+id,'store',{kind:'use_item',id,run_id:remote},result=>{if(runId!==local||banked||result.run_id!==remote||!result.consumed||result.consumed.id!==id||!['running','paused'].includes(sim.phase))return;if(id==='magnet')sim.magnet=Math.max(sim.magnet,12);else sim.shield_charges=Math.min(3,sim.shield_charges+1);sound.effect('powerup');},{quiet:true});if(screen==='running')showRunning();
   }
   function showDeleteConfirmation(){pause();const e=setScreen('delete','center shaded'),p=box('panel');p.append(text('h1','Delete your account?'),text('p','This permanently deletes your cloud profile, Diamonds, items and runner unlocks. Google Play purchase records remain with Google. The app will request a fresh sign-in.'),button('DELETE PERMANENTLY',()=>perform('delete','delete_account',{},result=>{if(result.deleted===true&&result.status==='deleted'){acceptIdentity({signed_in:false});syncStatus='Account deleted · guest play available';showSettings(settingsReturn);toast('Your cloud account was deleted.');}else toast('Deletion has not been confirmed. Your account remains signed in.');}),'danger'),button('CANCEL',()=>showSettings(settingsReturn)));e.append(p);}
-  function chooseAge(group){if(!['under13','teen','adult'].includes(group))return;age=group;platform.call('set_age',{group}).catch(()=>{});showMenu();refreshAccount();}
+  function chooseAge(group){
+    if(!['under13','teen','adult'].includes(group))return;
+    age=group;try{localStorage.setItem(AGE_KEY,group);}catch(_){toast('Age preference could not be saved. Check device storage.');}
+    // Native rewarded ads begin disabled and are enabled only after this value
+    // has been explicitly supplied. This is a group, not a birth date.
+    platform.call('set_age',{group}).catch(()=>{});showPostAgeLoading();refreshAccount();
+  }
+  // Second loading screen uses genuine asset-prewarm completion, never a fake timer percentage.
+  function showPostAgeLoading(){
+    if(typeof Image!=='function'){showMenu();return;}
+    const e=setScreen('post-age-loading','center shaded');
+    const p=box('panel transition-panel',text('div','SUBWAY RUNNER','transition-logo'),
+      text('h1','GET READY TO RUN!'),text('p','Finishing local sounds and city artwork…'));
+    const bar=box('transition-track'),fill=box('transition-fill');bar.append(fill);
+    const percent=text('strong','0%','transition-percent');p.append(bar,percent);e.append(p);
+    const requests=[];
+    const icon=new Image();requests.push(new Promise(resolve=>{icon.onload=icon.onerror=resolve;icon.src='assets/app-icon.png';if(icon.complete)resolve();}));
+    if(arcadeAudio.supported)for(const filename of ['arcade_menu','arcade_run']){
+      const a=arcadeAudio.get(filename);a.preload='auto';
+      requests.push(new Promise(resolve=>{if(a.readyState>=2){resolve();return;}
+        const finish=()=>{a.removeEventListener('loadeddata',finish);a.removeEventListener('error',finish);resolve();};
+        a.addEventListener('loadeddata',finish,{once:true});a.addEventListener('error',finish,{once:true});
+        try{a.load();}catch(_){finish();}
+      }));
+    }
+    let done=0,finished=false;const ownScreen=screenGeneration;
+    const next=()=>{if(finished||ownScreen!==screenGeneration)return;finished=true;showMenu();};
+    const fallback=setTimeout(()=>{if(ownScreen===screenGeneration){percent.textContent='READY';next();}},3500);
+    requests.forEach(request=>request.then(()=>{
+      if(ownScreen!==screenGeneration||finished)return;
+      done++;let pct=Math.round(done/requests.length*100);fill.style.width=pct+'%';percent.textContent=pct+'%';
+      if(done===requests.length){clearTimeout(fallback);setTimeout(next,450);}
+    }));
+  }
   function showAge(){
     pause();const e=setScreen('age','center shaded'),p=box('panel age-panel');
+    const ageArt=document.createElement('img');ageArt.src='assets/app-icon.png';ageArt.alt='Subway Runner original runner artwork';ageArt.className='age-hero-art';
+    p.append(box('age-hero',ageArt,text('span','WELCOME TO','age-welcome'),text('span','SUBWAY RUNNER','age-brand')));
     p.append(text('div','FIRST STOP · PLAYER SAFETY','eyebrow'),text('h1','How old are you?'),text('p','Slide to choose your age. We only save an age group, never your birthday.'));
     const label=text('strong','16 YEARS','age-value'),slider=document.createElement('input');
     slider.type='range';slider.min='6';slider.max='70';slider.value='16';slider.step='1';slider.className='age-slider';
@@ -155,9 +197,9 @@
   }
   function showMenu(){
     bankRun();sim.phase='ready';crashDelay=-1;
-    const e=setScreen('menu');const brand=box('menu-brand');brand.append(text('div','AN ORIGINAL CITY ADVENTURE','eyebrow'));const title=text('h1','SUBWAY','title');title.append(text('span','RUNNER'));brand.append(title,text('div','THE CITY IS YOUR PLAYGROUND','tagline'),text('div',syncStatus,'account-status'));
+    const e=setScreen('menu');e.append(box('menu-topbar',text('span','🔑  '+format(identity.signedIn?(serverProfile&&serverProfile.keys):0)+'   🟡  '+format(coinBalance()),'top-wallet'),iconButton('settings','⚙',()=>showSettings('menu'),'icon menu-settings')));const brand=box('menu-brand');brand.append(text('div','AN ORIGINAL CITY ADVENTURE','eyebrow'));const title=text('h1','SUBWAY','title');title.append(text('span','RUNNER'));brand.append(title,text('div','THE CITY IS YOUR PLAYGROUND','tagline'),text('div',syncStatus,'account-status'));
     brand.append(box('city-chip',text('span','✦'),text('strong',renderer&&renderer.district?renderer.district.name:'SUNRISE CITY'),text('span','· EXPLORE THE CITY')));e.append(brand);
-    const b=box('menu-bottom');b.append(box('wallet-row',text('span','BEST  '+format(profile.highScore)),text('span','● '+format(coinBalance())+'   ◆ '+format(diamondBalance()),'coin')),button('LET’S RUN  ›',startRun,'primary big'),box('row',button('RUNNERS + SHOP',showShop),button('DAILY SPIN',showSpin),button('SETTINGS',()=>showSettings('menu'))),text('p','Swipe to move · up to jump · down to slide\nDouble tap for shield','hint'));b.append(button(identity.signedIn?'PLAY GAMES · '+(identity.displayName||'CONNECTED'):'SIGN IN WITH PLAY GAMES',signIn,'play-games'));e.append(b);
+    const b=box('menu-bottom');b.append(button('TAP TO PLAY',startRun,'tap-to-play'));b.append(box('wallet-row',text('span','BEST  '+format(profile.highScore)),text('span','● '+format(coinBalance())+'   ◆ '+format(diamondBalance()),'coin')),button('LET’S RUN  ›',startRun,'primary big'),box('row menu-navigation',iconButton('missions','MISSIONS',showMissions),iconButton('runners','RUNNERS + SHOP',showShop),iconButton('spin','DAILY SPIN',showSpin),iconButton('events','EVENTS',showEvents)),text('p','Swipe to move · up to jump · down to slide\nDouble tap for shield','hint'));b.append(button(identity.signedIn?'PLAY GAMES · '+(identity.displayName||'CONNECTED'):'SIGN IN WITH PLAY GAMES',signIn,'play-games'));e.append(b);
   }
   function currentStyle(){return preview||profile.selected;}
   function finishPayload(snapshot){return {score:Math.max(0,Math.floor(snapshot.score||0)),distance:Math.max(0,Math.floor(snapshot.distance||0)),coins:Math.max(0,Math.floor(snapshot.coins||0))};}
@@ -204,14 +246,19 @@
   function showPause(){pause();const e=setScreen('pause','center shaded');const p=box('panel');p.append(text('div','TAKE A BREATHER','eyebrow'),text('h1','Your city can wait.'),text('p','Your run is paused.'),button('KEEP RUNNING',()=>{sim.set_paused(false);showRunning();},'primary'),button('SETTINGS',()=>showSettings('pause')),button('BACK TO MENU',showMenu));e.append(p);}
   function showShop(){
     pause();const e=setScreen('shop','shop-page');
+    e.append(button('×',()=>{preview='';sim.phase==='paused'?showPause():showMenu();},'dialog-close shop-close'));
     e.append(box('page-head',text('h2','Your run. Your style.'),text('span','● '+format(coinBalance())+'  ◆ '+format(diamondBalance()),'coin')));
-    const tabs=box('row tabs');[['RUNNERS','characters'],['DIAMONDS','diamonds'],['ITEMS','items']].forEach(([label,id])=>tabs.append(button(label,()=>{tab=id;showShop();},tab===id?'primary':'')));e.append(tabs);
+    const tabs=box('row tabs');[['RUNNERS','characters','runners'],['DIAMONDS','diamonds','diamond'],['ITEMS','items','shop']].forEach(([label,id,icon])=>tabs.append(iconButton(icon,label,()=>{tab=id;showShop();},tab===id?'primary':'')));e.append(tabs);
     if(tab==='characters'){
       const selected=STYLES.find(item=>item.id===(preview||profile.selected))||STYLES[0];
-      const stage=box('runner-showcase',text('div','LIVE 3D CHARACTER PREVIEW','showcase-label'),text('strong',selected.name+' · '+selected.subtitle.split(' · ').pop(),'showcase-name'),text('span','Select PREVIEW below to inspect any runner','showcase-hint'));
+      const stage=box('runner-showcase interactive',text('div','LIVE 3D CHARACTER PREVIEW','showcase-label'),text('strong',selected.name+' · '+selected.subtitle.split(' · ').pop(),'showcase-name'),text('span','Swipe on the character to rotate · Preview a runner below','showcase-hint'));
+      let drag=null;
+      stage.addEventListener('pointerdown',ev=>{drag={id:ev.pointerId,x:ev.clientX};stage.setPointerCapture?.(ev.pointerId);});
+      stage.addEventListener('pointermove',ev=>{if(!drag||drag.id!==ev.pointerId)return;renderer.rotatePreview((ev.clientX-drag.x)*.013);drag.x=ev.clientX;});
+      stage.addEventListener('pointerup',()=>{drag=null;});stage.addEventListener('pointercancel',()=>{drag=null;});
       e.append(stage);
     }
-    const list=box('shop-list');e.append(box('shop-scroll',list));
+    const list=box('shop-list '+(tab==='diamonds'?'diamond-grid':''));e.append(box('shop-scroll',list));
     if(tab==='characters')for(const s of STYLES){
       const avatar=text('div',s.name[0],'avatar');avatar.style.color=s.accent;avatar.style.background=s.accent+'24';
       const info=box('card-copy',text('strong',s.name),text('p',s.subtitle));let pick;
@@ -222,7 +269,7 @@
     }
     else if(tab==='diamonds')for(const pack of DIAMOND_PRODUCTS){
       const detail=productDetails.find(item=>(item.product_id||item.id)===pack.id),price=detail&&(detail.price||detail.formatted_price);
-      const card=box('card pack-card',text('strong','◆ '+format(pack.diamonds)+' Diamonds'),text('p','Consumable Diamond pack · verified by the game server.'));
+      const card=box('card pack-card diamond-tile',text('div','◆','diamond-icon'),text('strong',format(pack.diamonds)+' DIAMONDS'),text('p','Secure Play Store purchase'));
       const buy=button(price||'PRICE UNAVAILABLE',()=>protectedAction(()=>purchaseDiamonds(pack.id)),'primary');buy.disabled=!price||!canTransact();card.append(buy);list.append(card);
     }
     else {for(const item of (serverCatalog&&serverCatalog.items||[]).filter(item=>['magnet','shield'].includes(item.id))){const buy=button((item.currency==='coins'?'● ':'◆ ')+format(item.cost),()=>storePurchase(item.id));buy.disabled=!canTransact();list.append(box('card',box('card-copy',text('strong',item.name||item.id),text('p',(item.description||'Game item')+' · Owned '+format(serverProfile&&serverProfile.inventory&&serverProfile.inventory[item.id]))),buy));}
@@ -232,9 +279,43 @@
     e.append(box('row',button('RECONCILE PURCHASES',()=>platform.call('products',{reconcile:true}).then(result=>{loadProducts(result);return refreshAccount();}).catch(report)),button('DONE',()=>{preview='';sim.phase==='paused'?showPause():showMenu();},'primary')));
     if(!productDetails.length&&platform.available()&&!productsLoading){productsLoading=true;platform.call('products').then(result=>{loadProducts(result);if(screen==='shop'&&tab==='diamonds'&&productDetails.length)showShop();}).catch(()=>{}).finally(()=>{productsLoading=false;});}
   }
-  function showSettings(returnTo){pause();settingsReturn=returnTo||settingsReturn;const e=setScreen('settings','center shaded');const p=box('panel');p.append(text('div','MAKE IT YOURS','eyebrow'),text('h1','Settings'),text('div','GRAPHICS','section-title'));const q=box('row');for(const quality of ['low','medium','high'])q.append(button(quality[0].toUpperCase()+quality.slice(1),()=>{profile.settings.quality=quality;renderer.setQuality(quality);save();showSettings(settingsReturn);},profile.settings.quality===quality?'primary':''));p.append(q,text('p','Try Low for smoother play or longer battery life.','fine'));
-    for(const [label,key]of [['Music','music'],['Sound effects','sfx'],['On-screen controls','tap']]){const sw=button('',()=>{profile.settings[key]=!profile.settings[key];save();showSettings(settingsReturn);},'switch');sw.className='switch';sw.setAttribute('role','switch');sw.setAttribute('aria-label',label);sw.setAttribute('aria-checked',String(profile.settings[key]));p.append(box('toggle',text('span',label),sw));}
+  function showSettings(returnTo){pause();settingsReturn=returnTo||settingsReturn;const e=setScreen('settings','center shaded');const p=box('panel');p.append(button('×',()=>settingsReturn==='pause'?showPause():showMenu(),'dialog-close'),text('div','MAKE IT YOURS','eyebrow'),text('h1','Settings'),text('div','GRAPHICS','section-title'));const q=box('row');for(const quality of ['low','medium','high'])q.append(button(quality[0].toUpperCase()+quality.slice(1),()=>{profile.settings.quality=quality;renderer.setQuality(quality);save();showSettings(settingsReturn);},profile.settings.quality===quality?'primary':''));p.append(q,text('p','Try Low for smoother play or longer battery life.','fine'));
+    for(const [label,key]of [['Music','music'],['Sound effects','sfx'],['Vibration & haptics','haptics'],['On-screen controls','tap']]){const sw=button('',()=>{profile.settings[key]=!profile.settings[key];save();showSettings(settingsReturn);},'switch');sw.className='switch';sw.setAttribute('role','switch');sw.setAttribute('aria-label',label);sw.setAttribute('aria-checked',String(profile.settings[key]));p.append(box('toggle',text('span',label),sw));}
+    for(const [label,key] of [['Music volume','musicVolume'],['Sound volume','sfxVolume']]) {
+      const control=document.createElement('input');control.type='range';control.min='0';control.max='100';control.value=String(Math.round((profile.settings[key]??.8)*100));control.className='volume-slider';control.setAttribute('aria-label',label);
+      control.addEventListener('input',()=>{profile.settings[key]=Number(control.value)/100;save();});
+      p.append(box('volume-row',text('strong',label),control));
+    }
+    p.append(box('settings-region',text('strong','Country / Region'),text('span',((navigator.language||'en').split('-')[1]||'Device default')+' · device setting')));
     p.append(text('p',syncStatus,'fine'),button(identity.signedIn?'PLAY GAMES · CONNECTED':'SIGN IN WITH PLAY GAMES',signIn),button('SYNC PROGRESS',()=>refreshAccount(true)),button('CHECK PENDING REWARDS',checkRewards),button('PRIVACY POLICY',()=>protectedAction(()=>platform.call('open_privacy').catch(report))),button('AD PRIVACY OPTIONS',()=>platform.call('privacy_options',{},180000).catch(report)),button('ACCOUNT DELETION PAGE',()=>protectedAction(()=>platform.call('open_deletion').catch(report))),button('DELETE MY ACCOUNT',()=>protectedAction(showDeleteConfirmation)),button('DONE',()=>settingsReturn==='pause'?showPause():showMenu(),'primary'));if(identity.signedIn)p.append(button('SIGN OUT',async()=>{if(busy)return;try{acceptIdentity(await platform.call('sign_out'));syncStatus='Guest · saved on this device';showSettings(settingsReturn);}catch(error){report(error);}}));e.append(p);
+  }
+  function showMissions(){
+    pause();const e=setScreen('missions','center shaded'),p=box('panel mission-panel');
+    p.append(button('×',showMenu,'dialog-close'),text('div','GOALS & ACHIEVEMENTS','eyebrow'),text('h1','Runner Missions'),
+      text('p','Track your progress and explore all four city districts.'));
+    const s=state();const items=[
+      {name:'First Steps',value:profile.runs,target:1,unit:'run'},
+      {name:'City Explorer',value:profile.bestDistance,target:350,unit:'m best'},
+      {name:'Night Runner',value:profile.bestDistance,target:1050,unit:'m best'},
+      {name:'Score Hunter',value:profile.highScore,target:10000,unit:'score'}
+    ];
+    for(const item of items){const progress=Math.min(100,Math.floor(item.value/item.target*100));
+      const card=box('mission-card',text('strong',item.name),text('small',format(Math.min(item.value,item.target))+' / '+format(item.target)+' '+item.unit));
+      const track=box('mission-progress'),fill=box('mission-fill');fill.style.width=progress+'%';track.append(fill);card.append(track);
+      if(progress===100)card.append(text('span','✓ COMPLETED','mission-complete'));
+      p.append(card);
+    }
+    p.append(text('p','Mission progress is tracked from your saved local run statistics.','fine'),button('BACK TO MENU',showMenu,'primary'));e.append(p);
+  }
+  function showEvents(){
+    pause();const e=setScreen('events','center shaded'),p=box('panel event-panel');
+    p.append(button('×',showMenu,'dialog-close'),text('div','YOUR ARCADE HUB','eyebrow'),
+      text('h1','Events & Daily Rewards'),text('p','Challenge yourself, spin for daily rewards and beat your personal records.'),
+      box('event-banner',text('div','★','event-star'),text('strong','DAILY SPIN'),text('span','One free spin daily. Rewarded and Diamond spins follow the server rules.')),
+      button('OPEN DAILY SPIN',showSpin,'primary big'),
+      button('VIEW MISSIONS',showMissions),
+      text('p','Limited-time events are not active. We do not show invented event timers or rewards.','fine'),
+      button('BACK TO MENU',showMenu));e.append(p);
   }
   function missions(s){return[{label:'500m',value:Math.min(500,Math.floor(s.distance||0)),target:500},{label:'25 coins',value:Math.min(25,s.coins||0),target:25},{label:'5 jumps',value:Math.min(5,s.jumps||0),target:5}];}
   function bonus(s){return missions(s).filter(m=>m.value>=m.target).length*100;}
@@ -244,10 +325,44 @@
     const record=cloudRuns.get(runId);if(record){record.finish=finishPayload(s);persistPending();cloudQueue=cloudQueue.catch(()=>{}).then(()=>retryCloudRuns()).catch(error=>{syncStatus='Run sync pending · retry from Settings';report(error);});}
     syncProgress();
   }
+  function showHighScore(){
+    const s=state();const e=setScreen('highscore','center shaded');
+    const heading=text('h1','NEW HIGH SCORE!','highscore-title'),number=text('div',format(s.score),'highscore-number');
+    const content=box('highscore-content',heading,number,text('p','SUBWAY RUNNER · NEW PERSONAL BEST','highscore-caption'));
+    const next=button('TAP TO CONTINUE',showResults,'highscore-next');
+    content.append(next);e.append(content);
+    sound.effect('reward');
+  }
   function showResults(){
-    const s=state();const e=setScreen('results','center shaded'),p=box('panel');p.append(text('div','THERE’S ALWAYS ANOTHER ROUTE','eyebrow'),text('h1','Nice run!'),text('div',format(s.score),'score-big'),text('div',Math.floor(s.distance)+'m travelled   ·   ● '+format(s.coins)+' collected','stat-line'));
-    if(s.score>profile.highScore)p.append(text('div','NEW PERSONAL BEST','best'));if(bonus(s))p.append(text('div','MISSION BONUS  +'+bonus(s)+' coins','best'));p.append(button('RUN AGAIN  ›',startRun,'primary'));
-    if(age==='adult'&&s.can_revive&&!banked&&identity.signedIn&&serverRunId){const waiting=pending.get(actionKey('revive:'+runId));const revive=button(waiting&&waiting.waiting?'CHECK PENDING REVIVE':'WATCH AD · REVIVE',showRewardedRevive);revive.disabled=!canTransact();p.append(revive);}p.append(button('BACK TO MENU',showMenu),text('p','Run rewards are saved when you finish or start another run.','fine'));e.append(p);
+    const s=state(),e=setScreen('results','results-stage');
+    e.append(box('results-character',text('span','FULL 3D RUNNER','eyebrow')));
+    const p=box('panel results-panel');p.append(text('div','RUN COMPLETE','eyebrow'),text('h1','Your Run'),
+      box('results-score-grid',box('result-stat',text('span','SCORE'),text('strong',format(s.score))),
+      box('result-stat',text('span','COINS'),text('strong','● '+format(s.coins))),
+      box('result-stat',text('span','DISTANCE'),text('strong',Math.floor(s.distance)+'m'))));
+    if(s.score>profile.highScore)p.append(text('div','★ NEW HIGH SCORE!','best high-score-label'));
+    if(bonus(s))p.append(text('div','MISSION BONUS  +'+bonus(s)+' coins','best'));
+    p.append(button('CONTINUE',showMenu,'primary'),button('RUN AGAIN  ›',startRun),
+      text('p','Run rewards are saved when you finish or start another run.','fine'));
+    e.append(p);
+  }
+  function showRevivePrompt(){
+    if(age!=='adult'||!identity.signedIn||!serverRunId||!canTransact()||!state().can_revive){
+      return state().score>profile.highScore?showHighScore():showResults();
+    }
+    const e=setScreen('revive','center shaded'),p=box('panel revive-panel');
+    p.append(text('div','ONE MORE CHANCE','eyebrow'),text('h1','Continue your run?'),
+      text('div','↻','revive-icon'),text('p','Watch one voluntary rewarded ad to revive once in this run. Rewards require server verification.'),
+      button('▶ WATCH AD · REVIVE',showRewardedRevive,'primary big'),
+      button('NO THANKS',()=>state().score>profile.highScore?showHighScore():showResults()));e.append(p);
+  }
+  function showMultiplierReward(value,returnTo='spin'){
+    if(returnTo==='running')sim.set_paused(true);
+    const e=setScreen('multiplier','center reward-stage'),p=box('reward-content');
+    p.append(text('div','★','multiplier-star'),text('h1','+'+format(value||1)+' MULTIPLIER'),
+      text('p','Your score multiplier is ready!'),
+      button('TAP TO CONTINUE',()=>{if(returnTo==='running'){sim.set_paused(false);showRunning();}else showSpin();},'reward-next'));
+    e.append(p);sound.effect('reward');
   }
   async function showRewardedRevive(){
     if(age!=='adult'||sim.phase!=='crashed'||banked||!state().can_revive||!identity.signedIn||!serverRunId)return;
@@ -279,23 +394,24 @@
     p.append(hold,button('GO BACK',()=>{cancel();back();}));e.append(p);
   }
   function updateHUD(s){if(!hudRefs)return;hudRefs.score.textContent=String(Math.floor(s.score||0)).padStart(6,'0');hudRefs.coins.textContent='● '+format(s.coins);hudRefs.shield.disabled=(s.shield_charges||0)<=0;hudRefs.missions.textContent=missions(s).map(m=>(m.value>=m.target?'✓ ':'')+m.label+' '+m.value+'/'+m.target).join('  ·  ');const powers=[];if(s.shield>0)powers.push('SHIELD '+Math.ceil(s.shield)+'s');if(s.magnet>0)powers.push('MAGNET '+Math.ceil(s.magnet)+'s');if(s.double_score>0)powers.push('SCORE ×2');hudRefs.powers.textContent=powers.join('  ·  ');hudRefs.tutorial.style.display=(s.elapsed||0)<6?'block':'none';}
-  function onSimEvent(kind,payload){if(kind==='crash'){
+  function onSimEvent(kind,payload){if(kind==='powerup'&&payload&&payload.tag==='double_score'){showMultiplierReward(2,'running');}if(kind==='crash'){
       crashDelay=.82;sound.effect('crash');
       const burst=box('crash-burst');burst.setAttribute('aria-hidden','true');
       for(let n=0;n<7;n++){const star=text('span','★');star.style.setProperty('--angle',n*360/7+'deg');star.style.setProperty('--delay',n*30+'ms');burst.append(star);}ui.append(burst);
     }else sound.effect(kind);}
   function frame(now){
     const dt=lastFrame?Math.min(.075,Math.max(0,(now-lastFrame)/1000)):1/60;lastFrame=now;
-    try{if(screen==='running'&&sim.phase==='running')sim.update(dt);const s=state();if(renderer)renderer.render(s,dt,currentStyle(),screen==='shop'&&tab==='characters');if(screen==='running')updateHUD(s);if(crashDelay>=0){crashDelay-=dt;if(crashDelay<0&&sim.phase==='crashed')showResults();}sound.tick(now,screen==='running'&&sim.phase==='running',s);}catch(error){if(!renderErrorShown){renderErrorShown=true;toast('Graphics error: '+error.message);console.error(error);}}
+    try{if(screen==='running'&&sim.phase==='running')sim.update(dt);const s=state();if(renderer)renderer.render(s,dt,currentStyle(),(screen==='shop'&&tab==='characters')||['highscore','results'].includes(screen),['highscore','results'].includes(screen)?screen:'');if(screen==='running')updateHUD(s);if(crashDelay>=0){crashDelay-=dt;if(crashDelay<0&&sim.phase==='crashed'){showRevivePrompt();}}sound.tick(now,screen==='running'&&sim.phase==='running',s);}catch(error){if(!renderErrorShown){renderErrorShown=true;toast('Graphics error: '+error.message);console.error(error);}}
     animationId=requestAnimationFrame(frame);
   }
-  function togglePause(){if(screen==='running'){pause();showPause();}else if(screen==='pause'){sim.set_paused(false);showRunning();}else if(['shop','settings','parent','spin','delete'].includes(screen)){sim.phase==='paused'?showPause():showMenu();}}
+  function togglePause(){if(screen==='running'){pause();showPause();}else if(screen==='pause'){sim.set_paused(false);showRunning();}else if(['shop','settings','parent','spin','delete','revive','multiplier','missions','events'].includes(screen)){sim.phase==='paused'?showPause():showMenu();}}
   function beginPointer(e){if(screen!=='running'||sim.phase!=='running')return;if(pointer&&pointer.id!==e.pointerId){pointer=null;lastTap=-10000;return;}pointer={id:e.pointerId,x:e.clientX,y:e.clientY,t:performance.now()};canvas.setPointerCapture&&canvas.setPointerCapture(e.pointerId);}
   function movePointer(e){if(!pointer||pointer.id!==e.pointerId)return;const x=e.clientX-pointer.x,y=e.clientY-pointer.y;if(Math.hypot(x,y)<26)return;pointer=null;lastTap=-10000;if(Math.abs(x)>Math.abs(y))sim.move_lane(x>0?1:-1);else y<0?sim.jump():sim.slide();e.preventDefault();}
   function endPointer(e){if(!pointer||pointer.id!==e.pointerId)return;movePointer(e);if(pointer){const now=performance.now();if(now-pointer.t<250&&now-lastTap<300){sim.use_shield();lastTap=-10000;}else lastTap=now;pointer=null;}}
   canvas.addEventListener('pointerdown',beginPointer);canvas.addEventListener('pointermove',movePointer,{passive:false});canvas.addEventListener('pointerup',endPointer);canvas.addEventListener('pointercancel',()=>{pointer=null;lastTap=-10000;});
   window.addEventListener('keydown',e=>{if(e.target&&['INPUT','TEXTAREA'].includes(e.target.tagName))return;if(e.repeat)return;const k=e.key.toLowerCase();if(['escape','p'].includes(k)){e.preventDefault();togglePause();return;}if(screen!=='running')return;const actions={arrowleft:()=>sim.move_lane(-1),a:()=>sim.move_lane(-1),arrowright:()=>sim.move_lane(1),d:()=>sim.move_lane(1),arrowup:()=>sim.jump(),w:()=>sim.jump(),' ':()=>sim.jump(),arrowdown:()=>sim.slide(),s:()=>sim.slide(),h:()=>sim.use_shield()};if(actions[k]){e.preventDefault();actions[k]();}});
-  document.addEventListener('visibilitychange',()=>{pointer=null;lastFrame=0;if(document.hidden&&screen==='running'){pause();showPause();}if(document.hidden){screenGeneration++;sound.suspend();}});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&screen==='post-age-loading')showMenu();pointer=null;lastFrame=0;if(document.hidden&&screen==='running'){pause();showPause();}if(document.hidden){screenGeneration++;sound.suspend();}});
+  window.addEventListener('focus',()=>{if(screen==='post-age-loading')showMenu();});
   window.addEventListener('blur',()=>{screenGeneration++;pointer=null;if(screen==='running'){pause();showPause();}});
   window.addEventListener('resize',()=>{if(renderer)renderer.resize();});
   window.addEventListener('subway-back',togglePause);
@@ -315,24 +431,38 @@
     // event itself is never proof of a wallet credit or entitlement.
     if(['auth','purchase','profile','profile_refresh','purchase_verified'].includes(type))refreshAccount();
   });
-  const sound={ctx:null,master:null,next:0,note:0,unlock(){try{if(!this.ctx){const C=window.AudioContext||window.webkitAudioContext;if(!C)return;this.ctx=new C();this.master=this.ctx.createGain();this.master.gain.value=.2;this.master.connect(this.ctx.destination);}if(this.ctx.state==='suspended')this.ctx.resume().catch(()=>{});}catch(_e){}},suspend(){if(this.ctx&&this.ctx.state==='running')this.ctx.suspend().catch(()=>{});},tone(f,duration,sweep=1,gain=.3,type='sine'){if(!this.ctx||this.ctx.state!=='running')return;const t=this.ctx.currentTime,o=this.ctx.createOscillator(),g=this.ctx.createGain();o.type=type;o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(Math.max(30,f*sweep),t+duration);g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(gain,t+.008);g.gain.exponentialRampToValueAtTime(.001,t+duration);o.connect(g);g.connect(this.master);o.start(t);o.stop(t+duration+.01);o.onended=()=>{o.disconnect();g.disconnect();};},effect(kind){if(!profile||!profile.settings.sfx)return;const tones={coin:[940,.09,1.6,.25],jump:[260,.16,2,.2],slide:[220,.15,.5,.16],dive:[290,.19,.45,.2],roll:[120,.14,.75,.16],land:[75,.12,.9,.12],crash:[110,.35,.3,.35],powerup:[660,.25,2,.25],shield:[440,.2,1.5,.22]};if(tones[kind])this.tone(...tones[kind]);},tick(now,running,state){
+  // Locally generated ORIGINAL arcade audio. Only user gestures start music.
+  // Never streams protected tracks or loads anything from the network.
+  const arcadeAudio={supported:typeof window.Audio==='function',tracks:new Map(),unlocked:false,active:'',
+    get(name){if(!this.supported)return null;if(!this.tracks.has(name)){const a=new window.Audio('audio/'+name+'.ogg');a.preload='none';a.loop=name.startsWith('arcade_');this.tracks.set(name,a);}return this.tracks.get(name);},
+    unlock(){this.unlocked=true;},
+    effect(name){if(!this.unlocked||!profile?.settings.sfx||!this.supported)return false;
+      const file={lane:'button',dive:'slide',revive:'reward',shield_hit:'shield',land:'land',roll:'roll',train:'horn',lowbar:'crash',barrier:'crash',powerup:'powerup'}[name]||name;
+      const a=this.get(file);if(!a)return false;try{a.pause();a.currentTime=0;a.volume=Math.max(0,Math.min(1,(profile.settings.sfxVolume??.85)*.64));a.play().catch(()=>{});return true;}catch(_){return false;}},
+    tick(running){if(!this.unlocked||!this.supported||!profile)return;
+      const desired=profile.settings.music?(running?'arcade_run':'arcade_menu'):'';
+      if(this.active!==desired){const old=this.get(this.active);if(old){old.pause();old.currentTime=0;}this.active=desired;}
+      if(desired){const a=this.get(desired);a.volume=Math.min(.8,(profile.settings.musicVolume??.58)*.58);if(a.paused)a.play().catch(()=>{});}
+    },
+    pause(){for(const a of this.tracks.values())a.pause();this.active='';}
+  };
+  const sound={ctx:null,master:null,next:0,note:0,unlock(){arcadeAudio.unlock();try{if(!this.ctx){const C=window.AudioContext||window.webkitAudioContext;if(!C)return;this.ctx=new C();this.master=this.ctx.createGain();this.master.gain.value=.2;this.master.connect(this.ctx.destination);}if(this.ctx.state==='suspended')this.ctx.resume().catch(()=>{});}catch(_e){}},suspend(){arcadeAudio.pause();if(this.ctx&&this.ctx.state==='running')this.ctx.suspend().catch(()=>{});},tone(f,duration,sweep=1,gain=.3,type='sine'){if(!this.ctx||this.ctx.state!=='running')return;const t=this.ctx.currentTime,o=this.ctx.createOscillator(),g=this.ctx.createGain();o.type=type;o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(Math.max(30,f*sweep),t+duration);g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(gain,t+.008);g.gain.exponentialRampToValueAtTime(.001,t+duration);o.connect(g);g.connect(this.master);o.start(t);o.stop(t+duration+.01);o.onended=()=>{o.disconnect();g.disconnect();};},effect(kind){if(!profile||!profile.settings.sfx)return;if(arcadeAudio.effect(kind))return;const tones={lane:[310,.075,1.15,.06],coin:[940,.09,1.6,.25],jump:[260,.16,2,.2],slide:[220,.15,.5,.16],dive:[290,.19,.45,.2],roll:[120,.14,.75,.16],land:[75,.12,.9,.12],crash:[110,.35,.3,.35],powerup:[660,.25,2,.25],shield:[440,.2,1.5,.22],revive:[570,.25,1.8,.24],reward:[770,.24,1.5,.22],button:[350,.065,1.3,.08]};if(tones[kind]){const v=tones[kind].slice();v[3]*=profile.settings.sfxVolume??.85;this.tone(...v);}},tick(now,running,state){
+  arcadeAudio.tick(running);
   if(!profile||!running||!this.ctx||this.ctx.state!=='running')return;
   if(profile.settings.sfx){
     if(now>=(this.footstepNext||0)&&state&&state.grounded&&!state.sliding){
       this.footstepNext=now+Math.max(148,320-(Number(state.speed)||20)*5);
-      this.tone(this.note%2?112:126,.065,.58,.032,'triangle');
+      this.tone(this.note%2?112:126,.065,.58,.032*(profile.settings.sfxVolume??.85),'triangle');
     }
     if(now>=(this.hornNext||0)&&state&&state.objects&&state.objects.some(o=>o.kind==='train'&&o.moving&&o.z>-55&&o.z<-18)){
-      this.hornNext=now+4200;this.tone(205,.38,.72,.065,'sawtooth');this.tone(103,.44,.8,.065,'triangle');
+      this.hornNext=now+4200;this.tone(205,.38,.72,.065*(profile.settings.sfxVolume??.85),'sawtooth');this.tone(103,.44,.8,.065*(profile.settings.sfxVolume??.85),'triangle');
     }
   }
-  if(!profile.settings.music||now<this.next)return;
-  this.next=now+320;const notes=[261.63,329.63,392,523.25,440,392,329.63,293.66];
-  this.tone(notes[this.note++%notes.length],.23,1,.065,'triangle');if(this.note%2===0)this.tone(65.4,.19,.8,.1);
+  // Original OGG loops are the sole background tracks: no overlapping synthesized melody.
 }};
   try {
     if(typeof RunnerSimulation!=='function'||typeof RunnerRenderer!=='function'||!window.RUNNER_MODELS)throw Error('Game assets are missing. Please download the complete APK.');
-    profile=load();loadPending();sim=new RunnerSimulation();sim.onEvent=onSimEvent;sim.start(421);sim.phase='ready';renderer=new RunnerRenderer(canvas,window.RUNNER_MODELS);renderer.setQuality(profile.settings.quality);renderer.resize();if(window.RunnerLoadProgress)window.RunnerLoadProgress.complete();else document.getElementById('loading').remove();save();showAge();platform.call('set_age',{group:'unknown'}).catch(()=>{});if(platform.available())refreshAccount();animationId=requestAnimationFrame(frame);
+    profile=load();loadPending();sim=new RunnerSimulation();sim.onEvent=onSimEvent;sim.start(421);sim.phase='ready';renderer=new RunnerRenderer(canvas,window.RUNNER_MODELS);renderer.setQuality(profile.settings.quality);renderer.resize();if(window.RunnerLoadProgress)window.RunnerLoadProgress.complete();else document.getElementById('loading').remove();save();if(age==='unknown')showAge();else showMenu();platform.call('set_age',{group:age}).catch(()=>{});if(platform.available())refreshAccount();animationId=requestAnimationFrame(frame);
     window.subwayRunner={sim,renderer,get profile(){return profile;},get screen(){return screen;},get age(){return age;},chooseAge,start:startRun,showMenu,showShop,showSettings,showResults,showRewardedRevive,showSpin,signIn,refreshAccount,get serverProfile(){return serverProfile;},get identity(){return identity;},bankRun,bonus,controls:{beginPointer,movePointer,endPointer,togglePause},stop(){cancelAnimationFrame(animationId);sound.suspend();}};
   }catch(error){document.getElementById('loading').remove();const e=setScreen('error','center shaded');e.append(box('panel error-panel',text('h1','The city needs a restart.'),text('p',error.message),button('TRY AGAIN',()=>location.reload(),'primary')));console.error(error);}
 })();
