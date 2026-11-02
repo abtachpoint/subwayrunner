@@ -160,7 +160,9 @@ gl_FragColor=vec4(color,uAlpha);}`;
       const clip=showcase?'idle':crashed?'crash':state.diving?'roll':state.sliding?'slide':airborne?'jump':'run';
       skin.advance(clip==='run'?dt*clamp((Number(state.speed)||21)/21,1,2.4):dt,clip);
       const x=Number(state.player_x)||0,y=Number(state.player_y)||0;
-      const sway=showcase?this.previewAngle+Math.sin(this.clock*.5)*.12:0;
+      // Quaternius humanoids face +Z in their bind pose. The runner travels -Z.
+      // Turn 180 degrees only in gameplay; menu/shop previews face the camera.
+      const sway=showcase?this.previewAngle+Math.sin(this.clock*.5)*.12:PI;
       const lean=clamp((x-this.prevX)/Math.max(.016,dt)*-.018,-.18,.18);
       this.prevX=x;
       transform(this.root,x,y,0,0,sway,lean,1.16,1.16,1.16);
@@ -248,12 +250,33 @@ gl_FragColor=vec4(color,uAlpha);}`;
         let key=o.kind,y=0,ry=0;
         if(key==='train'){
           const trainTypes=['train-electric-subway-a','train-electric-subway-b','train-electric-subway-c','train-electric-city-a','train-electric-square-a','train-electric-bullet-a','train-diesel-a','train-locomotive-a','train-tram-classic'];
-          const name=o.car_role==='coach'?'train-carriage-box':trainTypes[mod(Number(o.color_index)||o.id||0,trainTypes.length)];
+          // Only enclosed passenger models are roof-traversable. The old open
+          // cargo box looked roofless although collision assumed a solid roof.
+          const name=o.car_role==='coach' ?
+            ['train-electric-subway-b','train-electric-city-b','train-electric-square-b'][mod(Number(o.color_index)||0,3)] :
+            trainTypes[mod(Number(o.color_index)||o.id||0,trainTypes.length)];
           const kenney=this.kenney['train:'+name];
           if(kenney){
-            // Kenney models are 2.6m long. Scale to the 14m collision envelope.
-            // A carriage shares the same 2.7m roof contact height.
-            transform(this.model,x,0,o.z,0,0,0,1.7,1.72,5.38);
+            // Source model's highest vertex is measured in original Kenney units.
+            // Exactly match every visual roof to the 2.7m physics roof.
+            const heights={
+              'train-electric-subway-a':1.57,'train-electric-subway-b':1.57,'train-electric-subway-c':1.57,
+              'train-electric-city-a':1.68,'train-electric-city-b':2.22,
+              'train-electric-square-a':2.32,'train-electric-square-b':1.78,
+              'train-electric-bullet-a':1.64,'train-diesel-a':1.59,
+              'train-locomotive-a':1.65625,'train-tram-classic':2.515625
+            };
+            const halfLengths={
+              'train-electric-subway-a':1.296875,'train-electric-subway-b':1.296875,
+              'train-electric-subway-c':1.296875,'train-electric-city-a':1.203125,
+              'train-electric-city-b':1.3515625,'train-electric-square-a':1.3515625,
+              'train-electric-square-b':1.296875,'train-electric-bullet-a':1.3984375,
+              'train-diesel-a':1.203125,'train-locomotive-a':1.296875,
+              'train-tram-classic':1.359375
+            };
+            const scaleY=(o.roof_height||2.7)/(heights[name]||1.7);
+            const scaleZ=(o.length||14)/(2*(halfLengths[name]||1.30));
+            transform(this.model,x,0,o.z,0,0,0,1.7,scaleY,scaleZ);
             this._draw(kenney,this.model);continue;
           }
           key='train'+mod(Number(o.color_index)||o.id||0,3);

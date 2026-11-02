@@ -1,3 +1,5 @@
+> **v1.2.1 train/roof/orientation hotfix:** See `docs/V121_TRAIN_GAMEPLAY_HOTFIX.md` for changes, test results and on-device acceptance gaps.
+
 # Subway Runner 1.2.0 — updated source release
 
 **Status: source-complete for Codemagic build, not independently Android-certified.**

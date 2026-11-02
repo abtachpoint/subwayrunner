@@ -26,7 +26,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = appVersionCode
-        versionName = "1.2.0"
+        versionName = "1.2.1"
         resValue("string", "play_games_app_id", gamesId.get())
         buildConfigField("String", "SERVER_CLIENT_ID", "\"613238310945-2i9sn4s6j2458pcbb87atclvkul2h79s.apps.googleusercontent.com\"")
         buildConfigField("String", "BACKEND_URL", "\"https://subway-runner-api.abirahomod12113.workers.dev\"")

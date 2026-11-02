@@ -21,7 +21,7 @@
       return ((v ^ v >>> 14) >>> 0) / 4294967296;
     }
     start(seed = 1, runnerStyle = 'courier') {
-      this._seed = Number(seed) >>> 0;
+      this._seed = Number(seed) >>> 0; this._run_seed = this._seed;
       this.runner_style = ['courier','skater','sprinter','robot','astronaut','neon','fox'].includes(runnerStyle) ? runnerStyle : 'courier';
       this.phase = 'running'; this.distance = 0; this.speed = 21; this.score = 0;
       this.coins = 0; this.lane = 0; this.player_x = 0; this.player_y = 0;
@@ -29,10 +29,10 @@
       this.elapsed = 0; this.shield_charges = this.runner_style === 'robot' ? 2 : 1; this.ground_safe_lane = 0;
       if (this.runner_style === 'neon' || this.runner_style === 'fox') this.magnet = this.runner_style === 'fox' ? 4 : 3;
       this.jumps = 0; this.slides = 0; this.dodges = 0;
-      this._objects = []; this._next_id = 1; this._next_segment = 44;
+      this._objects = []; this._next_id = 1; this._next_segment = 40;
       this._segment_number = 0; this._slide_time = 0; this._grounded = true;
       this._queued_slide = false; this._landing_time = 0;
-      this._support_id = 0; this._score_accumulator = 0; this._invulnerable = 0;
+      this._support_id = 0; this._roof_grace = 0; this._score_accumulator = 0; this._invulnerable = 0;
       this._revived = false; this._resume_phase = 'running'; this._route = [];
       this._generated_safe_lane = 0; this._route_direction = this._random() >= 0.5 ? 1 : -1;
       this._generate_ahead(); this._emit('start', {seed});
@@ -72,7 +72,7 @@
     revive() {
       if (this.phase !== 'crashed' || this._revived) return false;
       this._revived = true; this.phase = 'running'; this.player_y = 0;
-      this.vertical_velocity = 0; this._grounded = true; this._support_id = 0;
+      this.vertical_velocity = 0; this._grounded = true; this._support_id = 0; this._roof_grace = 0;
       this._slide_time = 0; this._queued_slide = false; this._landing_time = 0; this._invulnerable = 3;
       this._objects = this._objects.filter(o => o.z < -40 || o.z > o.length * 0.5 + 4);
       this._emit('revive', {distance:this.distance}); return true;
@@ -111,19 +111,23 @@
     }
     _update_vertical(dt) {
       const support = this._find_support(), height = support.height;
+      this._roof_grace = Math.max(0, this._roof_grace - dt);
       // Step smoothly onto ramps. Train roofs require a jump or ramp traversal;
       // never teleport a ground runner through the side of a moving train.
       if (this._grounded && support.kind === 'ramp' && this.player_y <= height + 0.15) {
-        this.player_y = height; this.vertical_velocity = 0; this._support_id = support.id; return;
+        this.player_y = height; this.vertical_velocity = 0; this._support_id = support.id;
+        if (height > 1.5) this._roof_grace = 0.19; return;
       }
       if (this._grounded && Math.abs(this.player_y - height) < 0.42) {
-        this.player_y = height; this.vertical_velocity = 0; this._support_id = support.id; return;
+        this.player_y = height; this.vertical_velocity = 0; this._support_id = support.id;
+        if (height > 1.5) this._roof_grace = 0.19; return;
       }
       const previous = this.player_y;
       this.vertical_velocity -= 31 * dt; this.player_y += this.vertical_velocity * dt;
       this._grounded = false;
       if (this.vertical_velocity <= 0 && previous >= height - 0.08 && this.player_y <= height) {
         this.player_y = height; this.vertical_velocity = 0; this._grounded = true; this._support_id = support.id;
+        if (height > 1.5) this._roof_grace = 0.19;
         this._land();
       }
       if (this.player_y <= 0) {
@@ -142,9 +146,10 @@
       let height = 0, id = 0, kind = 'ground';
       for (const o of this._objects) {
         if (o.removed || !this._shares_lane(o, 0.93) || !['ramp','train'].includes(o.kind) || Math.abs(o.z) > o.length * 0.5) continue;
-        const top = o.kind === 'ramp' ? clamp((o.z + o.length * 0.5) / o.length, 0, 1) * 2.7 : 2.7;
-        const reachable = o.kind === 'ramp' && this._grounded ||
-          this.player_y >= top - 0.42 || this._support_id === o.id;
+        const top = o.kind === 'ramp' ? clamp((o.z + o.length * 0.5) / o.length, 0, 1) * RunnerSimulation.ROOF_HEIGHT : (o.roof_height || RunnerSimulation.ROOF_HEIGHT);
+        const reachable = (o.kind === 'ramp' && this._grounded) ||
+          this.player_y >= top - 0.42 || this._support_id === o.id ||
+          (o.kind === 'train' && this._roof_grace > 0 && this.player_y > top - 0.68);
         if (top > height && reachable) { height = top; id = o.id; kind = o.kind; }
       }
       return {height, id, kind};
@@ -157,7 +162,13 @@
         const half = o.length * 0.5 + 0.30;
         if ((o.previous_z ?? o.z) - half > 0 || o.z + half < 0) continue;
         let hit = false;
-        if (o.kind === 'train') hit = this.player_y < 2.7 - 0.24;
+        if (o.kind === 'train') {
+          const roof = o.roof_height || RunnerSimulation.ROOF_HEIGHT;
+          // A coyote interval bridges the small space between connected coaches.
+          // Without this, a player running across the roof can hit an invisible wall.
+          const transitioningRoofs = this._roof_grace > 0 && this.player_y >= roof - 0.68;
+          hit = this.player_y < roof - 0.24 && !transitioningRoofs;
+        }
         else if (o.kind === 'barrier') hit = this.player_y < o.height - 0.04;
         else if (o.kind === 'lowbar') hit = this.player_y < 1.95 && this.player_y + (this._slide_time > 0 ? 0.70 : 1.70) > 1.20;
         if (hit && this._invulnerable <= 0) { this._hit(o); if (this.phase === 'crashed') return; }
@@ -189,18 +200,25 @@
     _shares_lane(o, width) { return Math.abs(this.player_x - o.lane * 2.6) < width; }
     _generate_ahead() {
       while (this._next_segment < this.distance + 205) {
-        this._spawn_segment(this._next_segment); this._next_segment += 73 + this._random() * 10; this._segment_number++;
+        this._spawn_segment(this._next_segment); this._next_segment += 43 + this._random() * 7; this._segment_number++;
       }
       while (this._route.length > 1 && this.distance > this._route[0].distance + 9) this._route.shift();
       if (this._route.length) this.ground_safe_lane = this._route[0].safe_lane;
     }
     _spawn_segment(at) {
       const z = this.distance - at;
-      if (Math.abs(this._generated_safe_lane + this._route_direction) > 1) this._route_direction *= -1;
-      this._generated_safe_lane += this._route_direction;
-      const safe = this._generated_safe_lane;
+      // Keep an actual navigable ground lane throughout each district block.
+      // Earlier per-wave safe-lane changes overlapped long 3-car convoys and
+      // occasionally produced an unavoidable three-lane collision.
+      const n = this._segment_number, sector = Math.floor(n / 8), slot = n % 8;
+      const safe = [-1,0,1][(sector + this._run_seed % 3) % 3];
+      this._generated_safe_lane = safe;
       this._route.push({distance:at, safe_lane:safe});
-      const lanes = [-1, 0, 1].filter(l => l !== safe), n = this._segment_number;
+      if (slot >= 6) { // Two open transition waves before the safe lane changes.
+        this._spawn_coin_line(safe,z-4,6,3,0.95);
+        return;
+      }
+      const lanes = [-1, 0, 1].filter(l => l !== safe);
       const hazard = lanes[n % 2], other = lanes[1 - n % 2], variant = n % 6;
       if (variant === 0 || variant === 2 || variant === 4) {
         // Frequent moving trains: a lead engine and two coaches in one lane.
@@ -221,7 +239,11 @@
           station.color_index = (n + 2) % 9;
           const ramp = this._new_object('ramp', other, station.z + 10, 7, 2.7);
           ramp.train_id = station.id;
-        } else this._spawn_coin_line(other,z-2,3,2.5,0.95);
+        } else {
+          // The secondary lane gets a visible jump/slide cue, not another train wall.
+          this._new_object(n % 4 === 0 ? 'barrier' : 'lowbar', other, z - 9, 1.1, n % 4 === 0 ? 1.05 : 1.9);
+          this._spawn_coin_line(other,z-2,3,2.5,0.95);
+        }
       } else {
         // Stopped train, with a traversable ramp on its approach and coins on top.
         const train = this._new_object('train', hazard, z, 14, 2.7);
@@ -232,7 +254,7 @@
         if (variant===3 || variant===5) {
           const transfer = this._new_object('train', other, z - 15, 14, 2.7);
           transfer.color_index = (n + 1) % 9; transfer.car_role = 'coach';
-        } else this._new_object('lowbar', other, z - 4, 1.1, 1.9);
+        } else this._new_object(variant === 1 ? 'barrier' : 'lowbar', other, z - 4, 1.1, variant === 1 ? 1.05 : 1.9);
       }
       this._spawn_coin_line(safe, z - 4, 4, 3, 0.95);
       if (n % 4 === 2) {
@@ -248,6 +270,7 @@
     }
     _new_object(kind, lane, z, length, height) {
       const o = {id:this._next_id++,kind,lane,z,previous_z:z,length,height,moving:false,own_speed:0};
+      if (kind === 'train') o.roof_height = RunnerSimulation.ROOF_HEIGHT;
       this._objects.push(o); return o;
     }
   }
