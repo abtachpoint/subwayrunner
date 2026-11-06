@@ -22,7 +22,8 @@ with ZipFile(target, "w", ZIP_DEFLATED, compresslevel=9) as archive:
             continue
         if file.name in {'.env', '.dev.vars', 'local.properties'} or (file.name.startswith(('.env.', '.dev.vars.')) and not file.name.endswith('.example')):
             continue
-        if file.name not in {".gitignore", ".env.example", ".dev.vars.example"} and file.suffix not in allowed_suffixes:
+        in_third_party = relative.parts[:2] == ('tools', 'third_party') and file.suffix in {'.glb', '.png'}  # CC0 source models used by tools/build_city_assets.py
+        if file.name not in {".gitignore", ".env.example", ".dev.vars.example"} and file.suffix not in allowed_suffixes and not in_third_party:
             continue
         if file.suffix == '.json':
             try:

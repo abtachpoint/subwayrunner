@@ -1,7 +1,7 @@
 # Keep this file at the repository root, beside android/, web/, and tools/.
 workflows:
   android-internal:
-    name: Subway Runner signed internal AAB + APK
+    name: Subway Runner signed internal AAB
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
@@ -28,7 +28,7 @@ workflows:
         script: |
           set -euo pipefail
           cd "$CM_BUILD_DIR"
-          node --test tests/*.test.cjs
+          node --test --test-isolation=none tests/*.test.cjs
           npm --prefix worker test
           python3 -m unittest discover -s tests -p 'test_ci_*.py'
       - name: Build and verify signed release bundle

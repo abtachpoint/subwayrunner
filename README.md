@@ -1,19 +1,11 @@
-> **v1.2.1 train/roof/orientation hotfix:** See `docs/V121_TRAIN_GAMEPLAY_HOTFIX.md` for changes, test results and on-device acceptance gaps.
 
-# Subway Runner 1.2.0 — updated source release
+## Visual / audio / gameplay update (5 November 2026)
 
-**Status: source-complete for Codemagic build, not independently Android-certified.**
-
-This snapshot adds playable rigged Quaternius male/female animations, 12 locally bundled original arcade-style UI icon designs, a second age-confirmation prewarm screen, a real 3D end-results presentation, a distinct server-gated revive popup, an interactive full-body Shop preview, Mission/Event panels, revamped Diamond Store cards, extra original audio mixing fixes, while retaining Kenney's 184 city/rail meshes, game logic fixes, the owner's app icon and existing Android integration stack.
-
-The current source requires **a fresh signed AAB/APK build in Codemagic**. It does not contain a compiled release. Android real-device rendering, ad SSV, purchases, Play Games and deployed backend need acceptance testing before store rollout. See `docs/FINAL_COMPLETION_AUDIT.md` for exact boundaries.
-
----
-
-# Subway Runner — Updated source handoff (1 November 2026)
-
-**Read `docs/FINAL_UPGRADE_DELIVERY_2026-11-01.md` for completed work, remaining animation runtime gap, tests, and Codemagic signing instructions.**
-
+New cartoon human runners, a full-body shop preview, slide/roll/dust animation, new train patterns (twin trains, climbable moving
+train, coupled coaches), four geometry-different neighbourhoods, a foot-over bridge, a procedural sound engine, a redesigned home
+screen and a 3D UI layer. Read [`docs/UPDATE_REPORT_VISUAL_AUDIO_GAMEPLAY.md`](docs/UPDATE_REPORT_VISUAL_AUDIO_GAMEPLAY.md);
+credits are in [`docs/CREDITS.md`](docs/CREDITS.md). Regenerate assets with `python3 tools/build_human_runners.py` and
+`python3 tools/build_city_assets.py` (needs numpy and Pillow).
 
 ## Latest release-target gameplay and graphics update (31 October 2026)
 
